@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, Leaf, ShoppingBag, Phone } from 'lucide-react';
+import { Menu, X, ShoppingBag } from 'lucide-react';
 import cpcbLogo from '@/assets/cpcb-logo.png';
+import bioBagLogo from '@/assets/bio-bag-india-logo.png';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -22,14 +23,8 @@ const Header = () => {
       <div className="container mx-auto px-4">
         <div className="flex h-20 items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 gradient-hero rounded-full flex items-center justify-center">
-              <Leaf className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div>
-              <h1 className="font-display text-xl font-bold text-foreground">Bio Bag India</h1>
-              <p className="text-xs text-muted-foreground">100% Biodegradable</p>
-            </div>
+          <Link to="/" className="flex items-center gap-2">
+            <img src={bioBagLogo} alt="Bio Bag India" className="h-14 w-auto" />
           </Link>
 
           {/* Desktop Navigation */}
