@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { getOrders, updateOrderStatus, deleteOrder, Order } from '@/lib/orderStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,10 +44,19 @@ const statusIcons: Record<Order['status'], typeof Clock> = {
 };
 
 const Admin = () => {
-  const [orders, setOrders] = useState<Order[]>(getOrders());
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Refresh orders on mount and when page gains focus
+  useEffect(() => {
+    setOrders(getOrders());
+    
+    const handleFocus = () => setOrders(getOrders());
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
