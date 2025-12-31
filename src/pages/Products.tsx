@@ -30,9 +30,6 @@ const ProductCard = ({ product }: { product: Product }) => {
               <h3 className="font-display text-xl font-semibold text-foreground">
                 {product.name}
               </h3>
-              <p className="text-sm text-primary font-medium">
-                ₹{product.pricePerKg}/kg
-              </p>
             </div>
           </div>
         </div>

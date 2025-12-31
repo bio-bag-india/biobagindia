@@ -192,7 +192,7 @@ const Order = () => {
                           <SelectContent>
                             {products.map((product) => (
                               <SelectItem key={product.id} value={product.id}>
-                                {product.name} - ₹{product.pricePerKg}/kg
+                                {product.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -255,27 +255,16 @@ const Order = () => {
                                 Size: {item.size} | Qty: {item.quantity} kg
                               </p>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <p className="font-semibold text-primary">
-                                ₹{(item.quantity * item.pricePerKg).toLocaleString()}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => removeItem(index)}
-                                className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         ))}
 
-                        <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg">
-                          <span className="font-semibold text-foreground">Total Amount</span>
-                          <span className="text-xl font-bold text-primary">
-                            ₹{calculateTotal().toLocaleString()}
-                          </span>
-                        </div>
                       </div>
                     </div>
                   )}
