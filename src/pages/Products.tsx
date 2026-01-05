@@ -53,17 +53,23 @@ const ProductCard = ({ product }: { product: Product }) => {
         </div>
 
         {/* Size Toggle */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full py-3 px-4 bg-muted rounded-lg text-foreground font-medium hover:bg-muted/80 transition-colors"
-        >
-          <span>View Available Sizes ({product.sizes.length})</span>
-          {isExpanded ? (
-            <ChevronUp className="w-5 h-5" />
-          ) : (
-            <ChevronDown className="w-5 h-5" />
-          )}
-        </button>
+        {product.sizes.length > 0 ? (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center justify-between w-full py-3 px-4 bg-muted rounded-lg text-foreground font-medium hover:bg-muted/80 transition-colors"
+          >
+            <span>View Available Sizes ({product.sizes.length})</span>
+            {isExpanded ? (
+              <ChevronUp className="w-5 h-5" />
+            ) : (
+              <ChevronDown className="w-5 h-5" />
+            )}
+          </button>
+        ) : (
+          <div className="py-3 px-4 bg-muted rounded-lg text-foreground font-medium">
+            Put Your Sizes
+          </div>
+        )}
 
         {/* Size Table */}
         {isExpanded && (

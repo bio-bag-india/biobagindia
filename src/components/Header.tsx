@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ShoppingBag } from 'lucide-react';
+import { Menu, X, ShoppingBag, MessageCircle } from 'lucide-react';
 import cpcbLogo from '@/assets/cpcb-logo.png';
 import bioBagLogo from '@/assets/bio-bag-india-logo.png';
 
@@ -44,6 +44,15 @@ const Header = () => {
 
           {/* Right Section */}
           <div className="hidden md:flex items-center gap-4">
+            <a
+              href="https://wa.me/919974830507"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-green-600 hover:text-green-700 transition-colors"
+            >
+              <MessageCircle className="w-5 h-5" />
+              <span className="text-sm font-medium">+91 99748 30507</span>
+            </a>
             <img src={cpcbLogo} alt="CPCB Certified" className="h-12 w-auto" />
             <Link to="/order">
               <Button variant="hero" size="lg">
