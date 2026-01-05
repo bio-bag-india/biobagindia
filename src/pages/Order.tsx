@@ -27,13 +27,20 @@ const Order = () => {
   // Current item being added
   const [selectedProduct, setSelectedProduct] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+  const [customSize, setCustomSize] = useState('');
   const [quantity, setQuantity] = useState('');
 
+  const isCustomBag = selectedProduct === 'custom-bags';
+
   const addItem = () => {
-    if (!selectedProduct || !selectedSize || !quantity) {
+    const sizeToUse = isCustomBag ? customSize : selectedSize;
+    
+    if (!selectedProduct || !sizeToUse || !quantity) {
       toast({
         title: 'Missing Information',
-        description: 'Please select a product, size, and enter quantity.',
+        description: isCustomBag 
+          ? 'Please enter custom size and quantity.' 
+          : 'Please select a product, size, and enter quantity.',
         variant: 'destructive',
       });
       return;
@@ -45,7 +52,7 @@ const Order = () => {
     const newItem: OrderItem = {
       productId: product.id,
       productName: product.name,
-      size: selectedSize,
+      size: sizeToUse,
       quantity: parseInt(quantity),
       pricePerKg: product.pricePerKg,
     };
@@ -53,11 +60,12 @@ const Order = () => {
     setOrderItems([...orderItems, newItem]);
     setSelectedProduct('');
     setSelectedSize('');
+    setCustomSize('');
     setQuantity('');
 
     toast({
       title: 'Item Added',
-      description: `${product.name} (${selectedSize}) added to your order.`,
+      description: `${product.name} (${sizeToUse}) added to your order.`,
     });
   };
 
@@ -147,6 +155,7 @@ const Order = () => {
   }
 
   const selectedProductData = products.find(p => p.id === selectedProduct);
+  const isCustomBagSelected = selectedProduct === 'custom-bags';
 
   return (
     <div className="min-h-screen bg-background">
@@ -199,7 +208,20 @@ const Order = () => {
                         </Select>
                       </div>
 
-                      {selectedProductData && (
+                      {selectedProductData && isCustomBagSelected && (
+                        <div>
+                          <Label htmlFor="customSize">Size (in inches, e.g., 12 X 16)</Label>
+                          <Input
+                            id="customSize"
+                            value={customSize}
+                            onChange={(e) => setCustomSize(e.target.value)}
+                            placeholder="Enter size like 12 X 16"
+                            className="mt-1"
+                          />
+                        </div>
+                      )}
+
+                      {selectedProductData && !isCustomBagSelected && selectedProductData.sizes.length > 0 && (
                         <div>
                           <Label htmlFor="size">Size</Label>
                           <Select value={selectedSize} onValueChange={setSelectedSize}>

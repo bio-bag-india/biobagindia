@@ -18,6 +18,16 @@ export interface Product {
 
 export const products: Product[] = [
   {
+    id: 'custom-bags',
+    name: 'Custom Bags',
+    description: '100% biodegradable carry bags made from corn starch. Perfect for retail stores, supermarkets, and daily shopping needs.',
+    category: 'carry',
+    image: '/placeholder.svg',
+    pricePerKg: 0,
+    sizes: [],
+    features: ['CPCB Certified', '180 Days Decomposition', 'Custom Printing Available', 'Food Safe'],
+  },
+  {
     id: 'carry-bags',
     name: 'Compostable Carry Bags',
     description: '100% biodegradable carry bags made from corn starch. Perfect for retail stores, supermarkets, and daily shopping needs.',
@@ -66,21 +76,6 @@ export const products: Product[] = [
       { size: '16 X 24', micron: 40, capacity: '10 KG', pcsPerKg: 40 },
     ],
     features: ['CPCB Certified', 'Food Grade', 'Water Resistant', 'Custom Sizes'],
-  },
-  {
-    id: 'courier-bags',
-    name: 'Courier Bags',
-    description: 'Secure and sustainable courier bags for e-commerce and logistics. Tamper-evident seal available.',
-    category: 'courier',
-    image: '/placeholder.svg',
-    pricePerKg: 200,
-    sizes: [
-      { size: '6 X 8', micron: 50, capacity: '0.5 KG', pcsPerKg: 150 },
-      { size: '8 X 10', micron: 50, capacity: '1 KG', pcsPerKg: 100 },
-      { size: '10 X 12', micron: 60, capacity: '2 KG', pcsPerKg: 70 },
-      { size: '12 X 16', micron: 60, capacity: '5 KG', pcsPerKg: 45 },
-    ],
-    features: ['CPCB Certified', 'Self-Seal Adhesive', 'Tamper Evident', 'Waterproof'],
   },
   {
     id: 'nursery-bags',
