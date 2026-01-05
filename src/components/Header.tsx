@@ -48,10 +48,9 @@ const Header = () => {
               href="https://wa.me/919974830507"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-green-600 hover:text-green-700 transition-colors"
+              className="flex items-center justify-center w-10 h-10 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors"
             >
               <MessageCircle className="w-5 h-5" />
-              <span className="text-sm font-medium">+91 99748 30507</span>
             </a>
             <img src={cpcbLogo} alt="CPCB Certified" className="h-12 w-auto" />
             <Link to="/order">
