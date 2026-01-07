@@ -174,6 +174,14 @@ const Order = () => {
               <p className="text-lg text-muted-foreground">
                 Fill in the details below and we'll get back to you with a quote.
               </p>
+              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="font-semibold text-amber-800">Temporary Notice</p>
+                <p className="text-amber-700 text-sm mt-1">
+                  Online purchasing is currently unavailable due to system maintenance.
+                  We are upgrading our database to provide a secure and reliable shopping experience.
+                  Please revisit shortly.
+                </p>
+              </div>
             </div>
           </div>
         </section>
