@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getOrders, updateOrderStatus, deleteOrder, Order } from '@/lib/orderStore';
+import { getProducts } from '@/lib/productStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import ProductManagement from '@/components/admin/ProductManagement';
 import { 
   LayoutDashboard, 
   Package, 
@@ -22,7 +24,8 @@ import {
   CheckCircle,
   XCircle,
   Truck,
-  PackageCheck
+  PackageCheck,
+  ShoppingBag
 } from 'lucide-react';
 
 const statusColors: Record<Order['status'], string> = {
@@ -48,12 +51,18 @@ const Admin = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products'>('dashboard');
+  const [totalProducts, setTotalProducts] = useState(0);
 
   // Refresh orders on mount and when page gains focus
   useEffect(() => {
     setOrders(getOrders());
+    setTotalProducts(getProducts().length);
     
-    const handleFocus = () => setOrders(getOrders());
+    const handleFocus = () => {
+      setOrders(getOrders());
+      setTotalProducts(getProducts().length);
+    };
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
@@ -119,14 +128,27 @@ const Admin = () => {
         </div>
 
         <nav className="space-y-2">
-          <div className="flex items-center gap-3 px-4 py-3 bg-sidebar-accent text-sidebar-foreground rounded-lg">
+          <button 
+            onClick={() => setActiveTab('dashboard')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'}`}
+          >
             <LayoutDashboard className="w-5 h-5" />
             <span className="font-medium">Dashboard</span>
-          </div>
-          <div className="flex items-center gap-3 px-4 py-3 text-sidebar-foreground/70 hover:bg-sidebar-accent rounded-lg cursor-pointer transition-colors">
+          </button>
+          <button 
+            onClick={() => setActiveTab('orders')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'orders' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'}`}
+          >
             <Package className="w-5 h-5" />
             <span>Orders</span>
-          </div>
+          </button>
+          <button 
+            onClick={() => setActiveTab('products')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'products' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'}`}
+          >
+            <ShoppingBag className="w-5 h-5" />
+            <span>Products</span>
+          </button>
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
@@ -158,27 +180,39 @@ const Admin = () => {
           </Link>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
-            <p className="text-sm text-muted-foreground mb-1">Total Orders</p>
-            <p className="text-3xl font-bold text-foreground">{orders.length}</p>
+        {/* Stats - Show on Dashboard */}
+        {activeTab === 'dashboard' && (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Total Orders</p>
+              <p className="text-3xl font-bold text-foreground">{orders.length}</p>
+            </div>
+            <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Pending</p>
+              <p className="text-3xl font-bold text-yellow-600">{pendingOrders}</p>
+            </div>
+            <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Completed</p>
+              <p className="text-3xl font-bold text-primary">{completedOrders}</p>
+            </div>
+            <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Products</p>
+              <p className="text-3xl font-bold text-foreground">{totalProducts}</p>
+            </div>
+            <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Revenue</p>
+              <p className="text-3xl font-bold text-foreground">₹{totalRevenue.toLocaleString()}</p>
+            </div>
           </div>
-          <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
-            <p className="text-sm text-muted-foreground mb-1">Pending</p>
-            <p className="text-3xl font-bold text-yellow-600">{pendingOrders}</p>
-          </div>
-          <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
-            <p className="text-sm text-muted-foreground mb-1">Completed</p>
-            <p className="text-3xl font-bold text-primary">{completedOrders}</p>
-          </div>
-          <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
-            <p className="text-sm text-muted-foreground mb-1">Revenue</p>
-            <p className="text-3xl font-bold text-foreground">₹{totalRevenue.toLocaleString()}</p>
-          </div>
-        </div>
+        )}
 
-        {/* Orders Section */}
+        {/* Products Tab */}
+        {activeTab === 'products' && (
+          <ProductManagement />
+        )}
+
+        {/* Orders Section - Show on Dashboard and Orders tab */}
+        {(activeTab === 'dashboard' || activeTab === 'orders') && (
         <div className="bg-card rounded-xl border border-border shadow-soft">
           <div className="p-6 border-b border-border">
             <h2 className="font-display text-xl font-bold text-foreground mb-4">Orders</h2>
@@ -290,6 +324,7 @@ const Admin = () => {
             )}
           </div>
         </div>
+        )}
       </main>
 
       {/* Order Detail Modal */}
