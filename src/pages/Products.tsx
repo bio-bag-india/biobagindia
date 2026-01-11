@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { getActiveProducts, Product, ProductSize } from '@/lib/productStore';
+import { getActiveProducts, Product } from '@/lib/productStore';
 import { ShoppingBag, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const categoryIcons: Record<string, string> = {
   carry: '🛍️',
@@ -115,11 +115,15 @@ const ProductCard = ({ product }: { product: Product }) => {
 const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [products, setProducts] = useState<Product[]>([]);
+  const location = useLocation();
 
   useEffect(() => {
+    // Refresh products when component mounts or route changes
     setProducts(getActiveProducts());
-    
-    // Refresh products when page gains focus
+  }, [location.pathname]);
+
+  useEffect(() => {
+    // Also refresh products when page gains focus
     const handleFocus = () => setProducts(getActiveProducts());
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
