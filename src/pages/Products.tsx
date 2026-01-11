@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { products, Product, ProductSize } from '@/lib/products';
+import { getActiveProducts, Product, ProductSize } from '@/lib/productStore';
 import { ShoppingBag, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -14,6 +14,7 @@ const categoryIcons: Record<string, string> = {
   nursery: '🌱',
   medical: '🏥',
   agriculture: '🌾',
+  custom: '✨',
 };
 
 const ProductCard = ({ product }: { product: Product }) => {
@@ -113,6 +114,16 @@ const ProductCard = ({ product }: { product: Product }) => {
 
 const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    setProducts(getActiveProducts());
+    
+    // Refresh products when page gains focus
+    const handleFocus = () => setProducts(getActiveProducts());
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
 
   const categories = [
     { id: 'all', label: 'All Products' },
@@ -122,6 +133,7 @@ const Products = () => {
     { id: 'courier', label: 'Courier Bags' },
     { id: 'nursery', label: 'Nursery Bags' },
     { id: 'medical', label: 'Medical Bags' },
+    { id: 'custom', label: 'Custom Bags' },
   ];
 
   const filteredProducts = selectedCategory === 'all' 
