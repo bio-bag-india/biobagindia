@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { MongoClient, ObjectId } from "npm:mongodb@6.3.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,7 +15,7 @@ interface OrderItem {
 }
 
 interface Order {
-  _id?: string;
+  _id?: ObjectId;
   orderId?: string;
   customerName: string;
   email: string;
@@ -30,33 +31,20 @@ interface Order {
   notes?: string;
 }
 
-// MongoDB Data API helper
-async function mongoDataAPI(action: string, body: Record<string, unknown>) {
-  const uri = Deno.env.get('MONGODB_URI');
-  if (!uri) {
-    throw new Error('MONGODB_URI not configured');
+let client: MongoClient | null = null;
+
+async function getMongoClient(): Promise<MongoClient> {
+  if (!client) {
+    const uri = Deno.env.get('MONGODB_URI');
+    if (!uri) {
+      throw new Error('MONGODB_URI not configured');
+    }
+    
+    client = new MongoClient(uri);
+    await client.connect();
+    console.log('Connected to MongoDB');
   }
-  
-  const response = await fetch(`${uri}/action/${action}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': Deno.env.get('MONGODB_API_KEY') || '',
-    },
-    body: JSON.stringify({
-      dataSource: 'Cluster0',
-      database: 'biobag',
-      collection: 'orders',
-      ...body,
-    }),
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`MongoDB API error: ${errorText}`);
-  }
-  
-  return response.json();
+  return client;
 }
 
 serve(async (req) => {
@@ -66,6 +54,10 @@ serve(async (req) => {
   }
 
   try {
+    const mongoClient = await getMongoClient();
+    const db = mongoClient.db('biobag');
+    const orders = db.collection<Order>('orders');
+    
     const url = new URL(req.url);
     const method = req.method;
     
@@ -75,26 +67,18 @@ serve(async (req) => {
       const id = url.searchParams.get('id');
       
       if (id) {
-        const response = await mongoDataAPI('findOne', {
-          filter: { _id: { $oid: id } },
-        });
-        result = response.document;
+        const doc = await orders.findOne({ _id: new ObjectId(id) });
+        result = doc;
       } else {
-        const response = await mongoDataAPI('find', {
-          filter: {},
-          sort: { createdAt: -1 },
-        });
-        result = response.documents;
+        const docs = await orders.find({}).sort({ createdAt: -1 }).toArray();
+        result = docs;
       }
       
     } else if (method === 'POST') {
       const body = await req.json();
       
       // Get count for order ID
-      const countResponse = await mongoDataAPI('aggregate', {
-        pipeline: [{ $count: 'total' }],
-      });
-      const count = countResponse.documents?.[0]?.total || 0;
+      const count = await orders.countDocuments({});
       const orderId = `ORD-${String(count + 1).padStart(3, '0')}`;
       
       const newOrder = {
@@ -104,18 +88,18 @@ serve(async (req) => {
         createdAt: new Date().toISOString(),
       };
       
-      const response = await mongoDataAPI('insertOne', { document: newOrder });
-      result = { ...newOrder, _id: response.insertedId };
+      const insertResult = await orders.insertOne(newOrder);
+      result = { ...newOrder, _id: insertResult.insertedId.toString() };
       
     } else if (method === 'PUT') {
       const body = await req.json();
       const { id, ...updates } = body;
       
-      const response = await mongoDataAPI('updateOne', {
-        filter: { _id: { $oid: id } },
-        update: { $set: updates },
-      });
-      result = response;
+      const updateResult = await orders.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updates }
+      );
+      result = { modifiedCount: updateResult.modifiedCount };
       
     } else if (method === 'DELETE') {
       const id = url.searchParams.get('id');
@@ -123,10 +107,8 @@ serve(async (req) => {
         throw new Error('Order ID required for deletion');
       }
       
-      const response = await mongoDataAPI('deleteOne', {
-        filter: { _id: { $oid: id } },
-      });
-      result = { deleted: response.deletedCount > 0 };
+      const deleteResult = await orders.deleteOne({ _id: new ObjectId(id) });
+      result = { deleted: deleteResult.deletedCount > 0 };
     }
     
     return new Response(JSON.stringify(result), {

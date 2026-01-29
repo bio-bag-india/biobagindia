@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { MongoClient, ObjectId } from "npm:mongodb@6.3.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +14,7 @@ interface ProductSize {
 }
 
 interface Product {
-  _id?: string;
+  _id?: ObjectId;
   name: string;
   description: string;
   category: string;
@@ -26,40 +27,20 @@ interface Product {
   updatedAt: string;
 }
 
-// MongoDB Data API helper
-async function mongoDataAPI(action: string, body: Record<string, unknown>) {
-  const uri = Deno.env.get('MONGODB_URI');
-  if (!uri) {
-    throw new Error('MONGODB_URI not configured');
+let client: MongoClient | null = null;
+
+async function getMongoClient(): Promise<MongoClient> {
+  if (!client) {
+    const uri = Deno.env.get('MONGODB_URI');
+    if (!uri) {
+      throw new Error('MONGODB_URI not configured');
+    }
+    
+    client = new MongoClient(uri);
+    await client.connect();
+    console.log('Connected to MongoDB');
   }
-  
-  // Parse the connection string to extract Data API credentials
-  // Expected format for Data API: https://data.mongodb-api.com/app/<app-id>/endpoint/data/v1
-  // Or extract app-id and api-key from URI
-  
-  // For MongoDB Atlas Data API, we need: endpoint URL and API key
-  // The MONGODB_URI should be the Data API endpoint with API key
-  
-  const response = await fetch(`${uri}/action/${action}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'api-key': Deno.env.get('MONGODB_API_KEY') || '',
-    },
-    body: JSON.stringify({
-      dataSource: 'Cluster0',
-      database: 'biobag',
-      collection: 'products',
-      ...body,
-    }),
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`MongoDB API error: ${errorText}`);
-  }
-  
-  return response.json();
+  return client;
 }
 
 serve(async (req) => {
@@ -69,6 +50,10 @@ serve(async (req) => {
   }
 
   try {
+    const mongoClient = await getMongoClient();
+    const db = mongoClient.db('biobag');
+    const products = db.collection<Product>('products');
+    
     const url = new URL(req.url);
     const method = req.method;
     
@@ -79,14 +64,12 @@ serve(async (req) => {
       const activeOnly = url.searchParams.get('activeOnly') === 'true';
       
       if (id) {
-        const response = await mongoDataAPI('findOne', {
-          filter: { _id: { $oid: id } },
-        });
-        result = response.document;
+        const doc = await products.findOne({ _id: new ObjectId(id) });
+        result = doc;
       } else {
         const filter = activeOnly ? { isActive: true } : {};
-        const response = await mongoDataAPI('find', { filter });
-        result = response.documents;
+        const docs = await products.find(filter).toArray();
+        result = docs;
       }
       
     } else if (method === 'POST') {
@@ -96,28 +79,27 @@ serve(async (req) => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      const response = await mongoDataAPI('insertOne', { document: newProduct });
-      result = { ...newProduct, _id: response.insertedId };
+      const insertResult = await products.insertOne(newProduct);
+      result = { ...newProduct, _id: insertResult.insertedId.toString() };
       
     } else if (method === 'PUT') {
       const body = await req.json();
       const { id, ...updates } = body;
       
-      const response = await mongoDataAPI('updateOne', {
-        filter: { _id: { $oid: id } },
-        update: { $set: { ...updates, updatedAt: new Date().toISOString() } },
-      });
-      result = response;
+      const updateResult = await products.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { ...updates, updatedAt: new Date().toISOString() } }
+      );
+      result = { modifiedCount: updateResult.modifiedCount };
       
     } else if (method === 'DELETE') {
       const id = url.searchParams.get('id');
       if (!id) {
         throw new Error('Product ID required for deletion');
       }
-      const response = await mongoDataAPI('deleteOne', {
-        filter: { _id: { $oid: id } },
-      });
-      result = { deleted: response.deletedCount > 0 };
+      
+      const deleteResult = await products.deleteOne({ _id: new ObjectId(id) });
+      result = { deleted: deleteResult.deletedCount > 0 };
     }
     
     return new Response(JSON.stringify(result), {
