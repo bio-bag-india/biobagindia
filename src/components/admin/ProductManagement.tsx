@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { 
-  useProducts, 
-  useAddProduct, 
-  useUpdateProduct, 
-  useDeleteProduct, 
-  useToggleProductStatus,
-  Product,
-  ProductFormData,
-  ProductCategory,
-} from '@/hooks/useProducts';
+  Product, 
+  ProductSize, 
+  getProducts, 
+  addProduct, 
+  updateProduct, 
+  deleteProduct, 
+  toggleProductStatus 
+} from '@/lib/productStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,8 +22,7 @@ import {
   EyeOff, 
   X,
   Package,
-  Image as ImageIcon,
-  Loader2
+  Image as ImageIcon
 } from 'lucide-react';
 
 const categories = [
@@ -38,54 +36,44 @@ const categories = [
   { value: 'custom', label: 'Custom Bags' },
 ];
 
-interface LocalProductSize {
-  size: string;
-  micron: number;
-  capacity: string;
-  pcs_per_kg: number;
-}
-
-interface LocalFormData {
+interface ProductFormData {
   name: string;
   description: string;
-  category: ProductCategory;
+  category: Product['category'];
   image: string;
-  price_per_kg: number;
-  sizes: LocalProductSize[];
+  pricePerKg: number;
+  sizes: ProductSize[];
   features: string[];
-  is_active: boolean;
+  isActive: boolean;
 }
 
-const emptyForm: LocalFormData = {
+const emptyForm: ProductFormData = {
   name: '',
   description: '',
   category: 'carry',
   image: '/placeholder.svg',
-  price_per_kg: 0,
+  pricePerKg: 0,
   sizes: [],
   features: [],
-  is_active: true,
+  isActive: true,
 };
 
 const ProductManagement = () => {
-  const { data: products = [], isLoading } = useProducts();
-  const addProduct = useAddProduct();
-  const updateProduct = useUpdateProduct();
-  const deleteProduct = useDeleteProduct();
-  const toggleStatus = useToggleProductStatus();
-
+  const [products, setProducts] = useState<Product[]>(getProducts());
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState<LocalFormData>(emptyForm);
+  const [formData, setFormData] = useState<ProductFormData>(emptyForm);
   const [newFeature, setNewFeature] = useState('');
-  const [newSize, setNewSize] = useState<LocalProductSize>({ size: '', micron: 0, capacity: '', pcs_per_kg: 0 });
+  const [newSize, setNewSize] = useState<ProductSize>({ size: '', micron: 0, capacity: '', pcsPerKg: 0 });
+
+  const refreshProducts = () => setProducts(getProducts());
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+      product.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -100,30 +88,39 @@ const ProductManagement = () => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
-      description: product.description || '',
+      description: product.description,
       category: product.category,
-      image: product.image || '/placeholder.svg',
-      price_per_kg: product.price_per_kg,
-      sizes: (product.sizes || []).map(s => ({
-        size: s.size,
-        micron: s.micron,
-        capacity: s.capacity,
-        pcs_per_kg: s.pcs_per_kg,
-      })),
+      image: product.image,
+      pricePerKg: product.pricePerKg,
+      sizes: [...product.sizes],
       features: [...product.features],
-      is_active: product.is_active,
+      isActive: product.isActive,
     });
     setShowModal(true);
   };
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
-      deleteProduct.mutate(id);
+      const deleted = deleteProduct(id);
+      if (deleted) {
+        refreshProducts();
+        toast({
+          title: 'Product Deleted',
+          description: `${name} has been deleted successfully.`,
+        });
+      }
     }
   };
 
-  const handleToggleStatus = (id: string, isActive: boolean) => {
-    toggleStatus.mutate({ id, isActive });
+  const handleToggleStatus = (id: string) => {
+    const updated = toggleProductStatus(id);
+    if (updated) {
+      refreshProducts();
+      toast({
+        title: updated.isActive ? 'Product Activated' : 'Product Deactivated',
+        description: `${updated.name} is now ${updated.isActive ? 'visible' : 'hidden'} on the products page.`,
+      });
+    }
   };
 
   const handleAddFeature = () => {
@@ -140,7 +137,7 @@ const ProductManagement = () => {
   const handleAddSize = () => {
     if (newSize.size && newSize.micron > 0) {
       setFormData({ ...formData, sizes: [...formData.sizes, { ...newSize }] });
-      setNewSize({ size: '', micron: 0, capacity: '', pcs_per_kg: 0 });
+      setNewSize({ size: '', micron: 0, capacity: '', pcsPerKg: 0 });
     }
   };
 
@@ -156,34 +153,28 @@ const ProductManagement = () => {
       return;
     }
 
-    const productData: ProductFormData = {
-      name: formData.name,
-      description: formData.description,
-      category: formData.category,
-      image: formData.image,
-      price_per_kg: formData.price_per_kg,
-      features: formData.features,
-      is_active: formData.is_active,
-      sizes: formData.sizes,
-    };
-
     if (editingProduct) {
-      updateProduct.mutate(
-        { id: editingProduct.id, data: productData },
-        { onSuccess: () => setShowModal(false) }
-      );
+      const updated = updateProduct(editingProduct.id, formData);
+      if (updated) {
+        refreshProducts();
+        setShowModal(false);
+        toast({
+          title: 'Product Updated',
+          description: `${formData.name} has been updated successfully.`,
+        });
+      }
     } else {
-      addProduct.mutate(productData, { onSuccess: () => setShowModal(false) });
+      const newProduct = addProduct(formData);
+      if (newProduct) {
+        refreshProducts();
+        setShowModal(false);
+        toast({
+          title: 'Product Added',
+          description: `${formData.name} has been added successfully.`,
+        });
+      }
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -225,7 +216,7 @@ const ProductManagement = () => {
         {filteredProducts.map((product) => (
           <div 
             key={product.id} 
-            className={`bg-card border rounded-xl p-4 transition-all ${!product.is_active ? 'opacity-60' : ''}`}
+            className={`bg-card border rounded-xl p-4 transition-all ${!product.isActive ? 'opacity-60' : ''}`}
           >
             <div className="flex items-start gap-4">
               <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
@@ -239,7 +230,7 @@ const ProductManagement = () => {
                 <h3 className="font-semibold text-foreground truncate">{product.name}</h3>
                 <p className="text-sm text-muted-foreground capitalize">{product.category}</p>
                 <p className="text-sm font-medium text-primary mt-1">
-                  {product.price_per_kg > 0 ? `₹${product.price_per_kg}/kg` : 'Custom Pricing'}
+                  {product.pricePerKg > 0 ? `₹${product.pricePerKg}/kg` : 'Custom Pricing'}
                 </p>
               </div>
             </div>
@@ -267,18 +258,16 @@ const ProductManagement = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleToggleStatus(product.id, product.is_active)}
-                className={product.is_active ? 'text-primary' : 'text-muted-foreground'}
-                disabled={toggleStatus.isPending}
+                onClick={() => handleToggleStatus(product.id)}
+                className={product.isActive ? 'text-primary' : 'text-muted-foreground'}
               >
-                {product.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                {product.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleDelete(product.id, product.name)}
                 className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                disabled={deleteProduct.isPending}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -341,7 +330,7 @@ const ProductManagement = () => {
                     <label className="text-sm font-medium text-foreground">Category</label>
                     <Select 
                       value={formData.category} 
-                      onValueChange={(value) => setFormData({ ...formData, category: value as ProductCategory })}
+                      onValueChange={(value) => setFormData({ ...formData, category: value as Product['category'] })}
                     >
                       <SelectTrigger className="mt-1">
                         <SelectValue />
@@ -358,8 +347,8 @@ const ProductManagement = () => {
                     <label className="text-sm font-medium text-foreground">Price per Kg (₹)</label>
                     <Input
                       type="number"
-                      value={formData.price_per_kg}
-                      onChange={(e) => setFormData({ ...formData, price_per_kg: Number(e.target.value) })}
+                      value={formData.pricePerKg}
+                      onChange={(e) => setFormData({ ...formData, pricePerKg: Number(e.target.value) })}
                       placeholder="0"
                       className="mt-1"
                     />
@@ -452,7 +441,7 @@ const ProductManagement = () => {
                             <td className="py-2 px-3">{size.size}</td>
                             <td className="py-2 px-3">{size.micron}</td>
                             <td className="py-2 px-3">{size.capacity}</td>
-                            <td className="py-2 px-3">{size.pcs_per_kg}</td>
+                            <td className="py-2 px-3">{size.pcsPerKg}</td>
                             <td className="py-2 px-3">
                               <button type="button" onClick={() => handleRemoveSize(index)} className="text-destructive">
                                 <X className="w-4 h-4" />
@@ -466,26 +455,27 @@ const ProductManagement = () => {
                 )}
               </div>
 
-              {/* Submit */}
-              <div className="flex gap-4 pt-4 border-t">
+              {/* Active Status */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="isActive" className="text-sm text-foreground">
+                  Product is active and visible on the products page
+                </label>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1">
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  className="flex-1"
-                  disabled={addProduct.isPending || updateProduct.isPending}
-                >
-                  {(addProduct.isPending || updateProduct.isPending) ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : editingProduct ? (
-                    'Update Product'
-                  ) : (
-                    'Add Product'
-                  )}
+                <Button type="submit" className="flex-1">
+                  {editingProduct ? 'Update Product' : 'Add Product'}
                 </Button>
               </div>
             </form>

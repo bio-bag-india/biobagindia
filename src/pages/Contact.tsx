@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { useSubmitContact } from '@/hooks/useContacts';
 import { MapPin, Phone, Mail, Clock, Send } from 'lucide-react';
 
 const Contact = () => {
@@ -15,8 +14,7 @@ const Contact = () => {
   const [phone, setPhone] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-
-  const submitContact = useSubmitContact();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,25 +28,21 @@ const Contact = () => {
       return;
     }
 
-    submitContact.mutate(
-      {
-        name,
-        email,
-        phone: phone || undefined,
-        company: subject || undefined, // Using subject as company for now
-        message,
-      },
-      {
-        onSuccess: () => {
-          // Reset form
-          setName('');
-          setEmail('');
-          setPhone('');
-          setSubject('');
-          setMessage('');
-        },
-      }
-    );
+    setIsSubmitting(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSubmitting(false);
+
+    toast({
+      title: 'Message Sent!',
+      description: 'Thank you for contacting us. We will get back to you soon.',
+    });
+
+    // Reset form
+    setName('');
+    setEmail('');
+    setPhone('');
+    setSubject('');
+    setMessage('');
   };
 
   return (
@@ -215,9 +209,9 @@ const Contact = () => {
                     variant="hero" 
                     size="lg" 
                     className="w-full"
-                    disabled={submitContact.isPending}
+                    disabled={isSubmitting}
                   >
-                    {submitContact.isPending ? (
+                    {isSubmitting ? (
                       'Sending...'
                     ) : (
                       <>
