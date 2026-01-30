@@ -6,10 +6,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { products } from '@/lib/products';
-import { addOrder, OrderItem } from '@/lib/orderStore';
+import { useActiveProducts, Product } from '@/hooks/useProducts';
+import { useCreateOrder, OrderItem } from '@/hooks/useOrders';
 import { toast } from '@/hooks/use-toast';
-import { ShoppingBag, Plus, Trash2, Check } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, Check, Loader2 } from 'lucide-react';
+
+interface LocalOrderItem {
+  productId: string;
+  productName: string;
+  size: string;
+  quantity: number;
+  pricePerKg: number;
+}
 
 const Order = () => {
   const [customerName, setCustomerName] = useState('');
@@ -20,8 +28,7 @@ const Order = () => {
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
   const [notes, setNotes] = useState('');
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderItems, setOrderItems] = useState<LocalOrderItem[]>([]);
   const [orderPlaced, setOrderPlaced] = useState(false);
 
   // Current item being added
@@ -30,7 +37,11 @@ const Order = () => {
   const [customSize, setCustomSize] = useState('');
   const [quantity, setQuantity] = useState('');
 
-  const isCustomBag = selectedProduct === 'custom-bags';
+  const { data: products = [], isLoading: isLoadingProducts } = useActiveProducts();
+  const createOrder = useCreateOrder();
+
+  const selectedProductData = products.find(p => p.id === selectedProduct);
+  const isCustomBag = selectedProductData?.category === 'custom';
 
   const addItem = () => {
     const sizeToUse = isCustomBag ? customSize : selectedSize;
@@ -46,15 +57,14 @@ const Order = () => {
       return;
     }
 
-    const product = products.find(p => p.id === selectedProduct);
-    if (!product) return;
+    if (!selectedProductData) return;
 
-    const newItem: OrderItem = {
-      productId: product.id,
-      productName: product.name,
+    const newItem: LocalOrderItem = {
+      productId: selectedProductData.id,
+      productName: selectedProductData.name,
       size: sizeToUse,
       quantity: parseInt(quantity),
-      pricePerKg: product.pricePerKg,
+      pricePerKg: selectedProductData.price_per_kg,
     };
 
     setOrderItems([...orderItems, newItem]);
@@ -65,7 +75,7 @@ const Order = () => {
 
     toast({
       title: 'Item Added',
-      description: `${product.name} (${sizeToUse}) added to your order.`,
+      description: `${selectedProductData.name} (${sizeToUse}) added to your order.`,
     });
   };
 
@@ -98,32 +108,31 @@ const Order = () => {
       return;
     }
 
-    setIsSubmitting(true);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const order = addOrder({
-      customerName,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      pincode,
-      items: orderItems,
-      totalAmount: calculateTotal(),
-      status: 'pending',
-      notes,
-    });
-
-    setIsSubmitting(false);
-    setOrderPlaced(true);
-
-    toast({
-      title: 'Order Placed Successfully!',
-      description: `Your order ID is ${order.id}. We will contact you shortly.`,
-    });
+    createOrder.mutate(
+      {
+        customer_name: customerName,
+        email,
+        phone,
+        address,
+        city,
+        state,
+        pincode,
+        total_amount: calculateTotal(),
+        notes: notes || undefined,
+        items: orderItems.map(item => ({
+          product_id: item.productId,
+          product_name: item.productName,
+          size: item.size,
+          quantity: item.quantity,
+          price_per_kg: item.pricePerKg,
+        })),
+      },
+      {
+        onSuccess: () => {
+          setOrderPlaced(true);
+        },
+      }
+    );
   };
 
   if (orderPlaced) {
@@ -154,9 +163,6 @@ const Order = () => {
     );
   }
 
-  const selectedProductData = products.find(p => p.id === selectedProduct);
-  const isCustomBagSelected = selectedProduct === 'custom-bags';
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -174,14 +180,6 @@ const Order = () => {
               <p className="text-lg text-muted-foreground">
                 Fill in the details below and we'll get back to you with a quote.
               </p>
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="font-semibold text-amber-800">Temporary Notice</p>
-                <p className="text-amber-700 text-sm mt-1">
-                  Online purchasing is currently unavailable due to system maintenance.
-                  We are upgrading our database to provide a secure and reliable shopping experience.
-                  Please revisit shortly.
-                </p>
-              </div>
             </div>
           </div>
         </section>
@@ -200,70 +198,78 @@ const Order = () => {
 
                     {/* Add Item Form */}
                     <div className="p-6 bg-card rounded-xl border border-border space-y-4">
-                      <div>
-                        <Label htmlFor="product">Product</Label>
-                        <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select a product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {selectedProductData && isCustomBagSelected && (
-                        <div>
-                          <Label htmlFor="customSize">Size (in inches, e.g., 12 X 16)</Label>
-                          <Input
-                            id="customSize"
-                            value={customSize}
-                            onChange={(e) => setCustomSize(e.target.value)}
-                            placeholder="Enter size like 12 X 16"
-                            className="mt-1"
-                          />
+                      {isLoadingProducts ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
                         </div>
+                      ) : (
+                        <>
+                          <div>
+                            <Label htmlFor="product">Product</Label>
+                            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="Select a product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {selectedProductData && isCustomBag && (
+                            <div>
+                              <Label htmlFor="customSize">Size (in inches, e.g., 12 X 16)</Label>
+                              <Input
+                                id="customSize"
+                                value={customSize}
+                                onChange={(e) => setCustomSize(e.target.value)}
+                                placeholder="Enter size like 12 X 16"
+                                className="mt-1"
+                              />
+                            </div>
+                          )}
+
+                          {selectedProductData && !isCustomBag && (selectedProductData.sizes?.length || 0) > 0 && (
+                            <div>
+                              <Label htmlFor="size">Size</Label>
+                              <Select value={selectedSize} onValueChange={setSelectedSize}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder="Select size" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(selectedProductData.sizes || []).map((size) => (
+                                    <SelectItem key={size.size} value={size.size}>
+                                      {size.size} ({size.capacity}) - {size.pcs_per_kg} pcs/kg
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          <div>
+                            <Label htmlFor="quantity">Quantity (in kg)</Label>
+                            <Input
+                              id="quantity"
+                              type="number"
+                              min="1"
+                              value={quantity}
+                              onChange={(e) => setQuantity(e.target.value)}
+                              placeholder="Enter quantity in kg"
+                              className="mt-1"
+                            />
+                          </div>
+
+                          <Button type="button" onClick={addItem} variant="outline" className="w-full">
+                            <Plus className="w-4 h-4" />
+                            Add to Order
+                          </Button>
+                        </>
                       )}
-
-                      {selectedProductData && !isCustomBagSelected && selectedProductData.sizes.length > 0 && (
-                        <div>
-                          <Label htmlFor="size">Size</Label>
-                          <Select value={selectedSize} onValueChange={setSelectedSize}>
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select size" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {selectedProductData.sizes.map((size) => (
-                                <SelectItem key={size.size} value={size.size}>
-                                  {size.size} ({size.capacity}) - {size.pcsPerKg} pcs/kg
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      <div>
-                        <Label htmlFor="quantity">Quantity (in kg)</Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          value={quantity}
-                          onChange={(e) => setQuantity(e.target.value)}
-                          placeholder="Enter quantity in kg"
-                          className="mt-1"
-                        />
-                      </div>
-
-                      <Button type="button" onClick={addItem} variant="outline" className="w-full">
-                        <Plus className="w-4 h-4" />
-                        Add to Order
-                      </Button>
                     </div>
                   </div>
 
@@ -294,7 +300,6 @@ const Order = () => {
                             </button>
                           </div>
                         ))}
-
                       </div>
                     </div>
                   )}
@@ -409,9 +414,9 @@ const Order = () => {
                     variant="hero" 
                     size="xl" 
                     className="w-full"
-                    disabled={isSubmitting || orderItems.length === 0}
+                    disabled={createOrder.isPending || orderItems.length === 0}
                   >
-                    {isSubmitting ? (
+                    {createOrder.isPending ? (
                       <>Processing...</>
                     ) : (
                       <>
