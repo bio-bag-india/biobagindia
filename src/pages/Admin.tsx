@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getOrders, updateOrderStatus, deleteOrder, Order } from '@/lib/orderStore';
-import { getProducts } from '@/lib/productStore';
+import { useOrders, useUpdateOrderStatus, useDeleteOrder, Order, OrderStatus } from '@/hooks/useOrders';
+import { useProducts } from '@/hooks/useProducts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from '@/hooks/use-toast';
 import ProductManagement from '@/components/admin/ProductManagement';
 import { 
   LayoutDashboard, 
@@ -14,7 +13,6 @@ import {
   Search, 
   Eye,
   Trash2,
-  ChevronDown,
   ArrowLeft,
   Calendar,
   MapPin,
@@ -25,10 +23,11 @@ import {
   XCircle,
   Truck,
   PackageCheck,
-  ShoppingBag
+  ShoppingBag,
+  Loader2
 } from 'lucide-react';
 
-const statusColors: Record<Order['status'], string> = {
+const statusColors: Record<OrderStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
   confirmed: 'bg-blue-100 text-blue-800',
   processing: 'bg-purple-100 text-purple-800',
@@ -37,7 +36,7 @@ const statusColors: Record<Order['status'], string> = {
   cancelled: 'bg-red-100 text-red-800',
 };
 
-const statusIcons: Record<Order['status'], typeof Clock> = {
+const statusIcons: Record<OrderStatus, typeof Clock> = {
   pending: Clock,
   confirmed: CheckCircle,
   processing: Package,
@@ -47,30 +46,20 @@ const statusIcons: Record<Order['status'], typeof Clock> = {
 };
 
 const Admin = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { data: orders = [], isLoading: isLoadingOrders } = useOrders();
+  const { data: products = [] } = useProducts();
+  const updateStatus = useUpdateOrderStatus();
+  const deleteOrder = useDeleteOrder();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products'>('dashboard');
-  const [totalProducts, setTotalProducts] = useState(0);
-
-  // Refresh orders on mount and when page gains focus
-  useEffect(() => {
-    setOrders(getOrders());
-    setTotalProducts(getProducts().length);
-    
-    const handleFocus = () => {
-      setOrders(getOrders());
-      setTotalProducts(getProducts().length);
-    };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.email.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
@@ -78,34 +67,23 @@ const Admin = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
-    const updated = updateOrderStatus(orderId, newStatus);
-    if (updated) {
-      setOrders(getOrders());
-      toast({
-        title: 'Status Updated',
-        description: `Order ${orderId} status changed to ${newStatus}.`,
-      });
+  const handleStatusChange = (orderId: string, newStatus: OrderStatus) => {
+    updateStatus.mutate({ id: orderId, status: newStatus });
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder({ ...selectedOrder, status: newStatus });
     }
   };
 
   const handleDelete = (orderId: string) => {
     if (window.confirm(`Are you sure you want to delete order ${orderId}?`)) {
-      const deleted = deleteOrder(orderId);
-      if (deleted) {
-        setOrders(getOrders());
-        setSelectedOrder(null);
-        toast({
-          title: 'Order Deleted',
-          description: `Order ${orderId} has been deleted.`,
-        });
-      }
+      deleteOrder.mutate(orderId);
+      setSelectedOrder(null);
     }
   };
 
   const totalRevenue = orders.reduce((sum, order) => {
     if (order.status !== 'cancelled') {
-      return sum + order.totalAmount;
+      return sum + order.total_amount;
     }
     return sum;
   }, 0);
@@ -197,7 +175,7 @@ const Admin = () => {
             </div>
             <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
               <p className="text-sm text-muted-foreground mb-1">Products</p>
-              <p className="text-3xl font-bold text-foreground">{totalProducts}</p>
+              <p className="text-3xl font-bold text-foreground">{products.length}</p>
             </div>
             <div className="bg-card p-6 rounded-xl border border-border shadow-soft">
               <p className="text-sm text-muted-foreground mb-1">Revenue</p>
@@ -247,76 +225,82 @@ const Admin = () => {
 
           {/* Orders Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Order ID</th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Customer</th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground hidden md:table-cell">Date</th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Amount</th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => {
-                  const StatusIcon = statusIcons[order.status];
-                  return (
-                    <tr key={order.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td className="py-4 px-6">
-                        <span className="font-medium text-foreground">{order.id}</span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div>
-                          <p className="font-medium text-foreground">{order.customerName}</p>
-                          <p className="text-sm text-muted-foreground">{order.email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 hidden md:table-cell">
-                        <span className="text-muted-foreground">
-                          {order.createdAt.toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-foreground">
-                          ₹{order.totalAmount.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setSelectedOrder(order)}
-                            className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(order.id)}
-                            className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                            title="Delete Order"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {isLoadingOrders ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/50">
+                    <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Order ID</th>
+                    <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Customer</th>
+                    <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                    <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Amount</th>
+                    <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-4 px-6 text-sm font-medium text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOrders.map((order) => {
+                    const StatusIcon = statusIcons[order.status];
+                    return (
+                      <tr key={order.id} className="border-b border-border hover:bg-muted/30 transition-colors">
+                        <td className="py-4 px-6">
+                          <span className="font-medium text-foreground">{order.order_number}</span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div>
+                            <p className="font-medium text-foreground">{order.customer_name}</p>
+                            <p className="text-sm text-muted-foreground">{order.email}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 hidden md:table-cell">
+                          <span className="text-muted-foreground">
+                            {new Date(order.created_at).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="font-semibold text-foreground">
+                            ₹{order.total_amount.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[order.status]}`}>
+                            <StatusIcon className="w-3 h-3" />
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSelectedOrder(order)}
+                              className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(order.id)}
+                              className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                              title="Delete Order"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
 
-            {filteredOrders.length === 0 && (
+            {!isLoadingOrders && filteredOrders.length === 0 && (
               <div className="text-center py-12">
                 <Package className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
                 <p className="text-muted-foreground">No orders found</p>
@@ -333,7 +317,7 @@ const Admin = () => {
           <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-lg">
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h3 className="font-display text-xl font-bold text-foreground">
-                Order Details - {selectedOrder.id}
+                Order Details - {selectedOrder.order_number}
               </h3>
               <button
                 onClick={() => setSelectedOrder(null)}
@@ -349,10 +333,7 @@ const Admin = () => {
                 <span className="font-medium text-foreground">Order Status</span>
                 <Select 
                   value={selectedOrder.status} 
-                  onValueChange={(value) => {
-                    handleStatusChange(selectedOrder.id, value as Order['status']);
-                    setSelectedOrder({...selectedOrder, status: value as Order['status']});
-                  }}
+                  onValueChange={(value) => handleStatusChange(selectedOrder.id, value as OrderStatus)}
                 >
                   <SelectTrigger className="w-[160px]">
                     <SelectValue />
@@ -389,7 +370,7 @@ const Admin = () => {
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="w-4 h-4" />
                     <span className="text-sm">
-                      {selectedOrder.createdAt.toLocaleDateString('en-IN', {
+                      {new Date(selectedOrder.created_at).toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'long',
                         year: 'numeric'
@@ -402,27 +383,19 @@ const Admin = () => {
               {/* Order Items */}
               <div>
                 <h4 className="font-semibold text-foreground mb-3">Order Items</h4>
-                <div className="space-y-3">
-                  {selectedOrder.items.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  {(selectedOrder.items || []).map((item, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <div>
-                        <p className="font-medium text-foreground">{item.productName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Size: {item.size} | Qty: {item.quantity} kg
-                        </p>
+                        <p className="font-medium text-foreground">{item.product_name}</p>
+                        <p className="text-sm text-muted-foreground">Size: {item.size}</p>
                       </div>
-                      <p className="font-semibold text-foreground">
-                        ₹{(item.quantity * item.pricePerKg).toLocaleString()}
-                      </p>
+                      <div className="text-right">
+                        <p className="font-medium text-foreground">{item.quantity} kg</p>
+                        <p className="text-sm text-muted-foreground">₹{item.price_per_kg}/kg</p>
+                      </div>
                     </div>
                   ))}
-
-                  <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
-                    <span className="font-semibold text-foreground">Total Amount</span>
-                    <span className="text-xl font-bold text-primary">
-                      ₹{selectedOrder.totalAmount.toLocaleString()}
-                    </span>
-                  </div>
                 </div>
               </div>
 
@@ -430,25 +403,19 @@ const Admin = () => {
               {selectedOrder.notes && (
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Notes</h4>
-                  <p className="text-muted-foreground text-sm p-3 bg-muted/50 rounded-lg">
+                  <p className="text-muted-foreground text-sm p-3 bg-muted rounded-lg">
                     {selectedOrder.notes}
                   </p>
                 </div>
               )}
-            </div>
 
-            <div className="p-6 border-t border-border flex gap-3">
-              <Button variant="outline" onClick={() => setSelectedOrder(null)} className="flex-1">
-                Close
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={() => handleDelete(selectedOrder.id)}
-                className="flex-1"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Order
-              </Button>
+              {/* Total */}
+              <div className="flex items-center justify-between p-4 bg-primary/10 rounded-lg">
+                <span className="font-semibold text-foreground">Total Amount</span>
+                <span className="text-xl font-bold text-primary">
+                  ₹{selectedOrder.total_amount.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { getActiveProducts, Product } from '@/lib/productStore';
-import { ShoppingBag, Check, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { useActiveProducts, Product, ProductSize } from '@/hooks/useProducts';
+import { ShoppingBag, Check, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const categoryIcons: Record<string, string> = {
   carry: '🛍️',
@@ -17,7 +17,31 @@ const categoryIcons: Record<string, string> = {
   custom: '✨',
 };
 
-const ProductCard = ({ product }: { product: Product }) => {
+// Transform DB product to display format
+interface DisplayProduct {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  features: string[];
+  sizes: { size: string; micron: number; capacity: string; pcsPerKg: number }[];
+}
+
+const transformProduct = (product: Product): DisplayProduct => ({
+  id: product.id,
+  name: product.name,
+  description: product.description || '',
+  category: product.category,
+  features: product.features,
+  sizes: (product.sizes || []).map(s => ({
+    size: s.size,
+    micron: s.micron,
+    capacity: s.capacity,
+    pcsPerKg: s.pcs_per_kg,
+  })),
+});
+
+const ProductCard = ({ product }: { product: DisplayProduct }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -26,7 +50,7 @@ const ProductCard = ({ product }: { product: Product }) => {
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <span className="text-4xl">{categoryIcons[product.category]}</span>
+            <span className="text-4xl">{categoryIcons[product.category] || '📦'}</span>
             <div>
               <h3 className="font-display text-xl font-semibold text-foreground">
                 {product.name}
@@ -114,20 +138,9 @@ const ProductCard = ({ product }: { product: Product }) => {
 
 const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [products, setProducts] = useState<Product[]>([]);
-  const location = useLocation();
+  const { data: products = [], isLoading } = useActiveProducts();
 
-  useEffect(() => {
-    // Refresh products when component mounts or route changes
-    setProducts(getActiveProducts());
-  }, [location.pathname]);
-
-  useEffect(() => {
-    // Also refresh products when page gains focus
-    const handleFocus = () => setProducts(getActiveProducts());
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
+  const displayProducts = products.map(transformProduct);
 
   const categories = [
     { id: 'all', label: 'All Products' },
@@ -141,8 +154,8 @@ const Products = () => {
   ];
 
   const filteredProducts = selectedCategory === 'all' 
-    ? products 
-    : products.filter(p => p.category === selectedCategory);
+    ? displayProducts 
+    : displayProducts.filter(p => p.category === selectedCategory);
 
   return (
     <div className="min-h-screen bg-background">
@@ -189,11 +202,21 @@ const Products = () => {
         {/* Products Grid */}
         <section className="py-16">
           <div className="container mx-auto px-4">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No products found in this category.</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>
