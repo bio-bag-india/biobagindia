@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
-import { getActiveProducts, Product } from '@/lib/productStore';
-import { ShoppingBag, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { useActiveProducts, Product } from '@/hooks/use-products';
+import { ShoppingBag, Check, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const categoryIcons: Record<string, string> = {
@@ -114,20 +114,13 @@ const ProductCard = ({ product }: { product: Product }) => {
 
 const Products = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [products, setProducts] = useState<Product[]>([]);
+  const { data: products = [], isLoading, refetch } = useActiveProducts();
   const location = useLocation();
 
   useEffect(() => {
-    // Refresh products when component mounts or route changes
-    setProducts(getActiveProducts());
-  }, [location.pathname]);
-
-  useEffect(() => {
-    // Also refresh products when page gains focus
-    const handleFocus = () => setProducts(getActiveProducts());
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
+    // Refresh products when route changes
+    refetch();
+  }, [location.pathname, refetch]);
 
   const categories = [
     { id: 'all', label: 'All Products' },
@@ -189,11 +182,21 @@ const Products = () => {
         {/* Products Grid */}
         <section className="py-16">
           <div className="container mx-auto px-4">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No products found in this category.</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </main>

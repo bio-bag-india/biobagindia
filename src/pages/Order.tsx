@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { products } from '@/lib/products';
-import { addOrder, OrderItem } from '@/lib/orderStore';
+import { useActiveProducts, Product } from '@/hooks/use-products';
+import { useCreateOrder, OrderItem } from '@/hooks/use-orders';
 import { toast } from '@/hooks/use-toast';
-import { ShoppingBag, Plus, Trash2, Check } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, Check, Loader2 } from 'lucide-react';
 
 const Order = () => {
   const [customerName, setCustomerName] = useState('');
@@ -21,8 +21,8 @@ const Order = () => {
   const [pincode, setPincode] = useState('');
   const [notes, setNotes] = useState('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [orderNumber, setOrderNumber] = useState('');
 
   // Current item being added
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -30,7 +30,11 @@ const Order = () => {
   const [customSize, setCustomSize] = useState('');
   const [quantity, setQuantity] = useState('');
 
-  const isCustomBag = selectedProduct === 'custom-bags';
+  const { data: products = [], isLoading: productsLoading } = useActiveProducts();
+  const createOrder = useCreateOrder();
+
+  const selectedProductData = products.find(p => p.id === selectedProduct);
+  const isCustomBag = selectedProductData?.category === 'custom';
 
   const addItem = () => {
     const sizeToUse = isCustomBag ? customSize : selectedSize;
@@ -46,15 +50,14 @@ const Order = () => {
       return;
     }
 
-    const product = products.find(p => p.id === selectedProduct);
-    if (!product) return;
+    if (!selectedProductData) return;
 
     const newItem: OrderItem = {
-      productId: product.id,
-      productName: product.name,
+      productId: selectedProductData.id,
+      productName: selectedProductData.name,
       size: sizeToUse,
       quantity: parseInt(quantity),
-      pricePerKg: product.pricePerKg,
+      pricePerKg: selectedProductData.pricePerKg,
     };
 
     setOrderItems([...orderItems, newItem]);
@@ -65,7 +68,7 @@ const Order = () => {
 
     toast({
       title: 'Item Added',
-      description: `${product.name} (${sizeToUse}) added to your order.`,
+      description: `${selectedProductData.name} (${sizeToUse}) added to your order.`,
     });
   };
 
@@ -98,32 +101,38 @@ const Order = () => {
       return;
     }
 
-    setIsSubmitting(true);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const order = addOrder({
-      customerName,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      pincode,
-      items: orderItems,
-      totalAmount: calculateTotal(),
-      status: 'pending',
-      notes,
-    });
-
-    setIsSubmitting(false);
-    setOrderPlaced(true);
-
-    toast({
-      title: 'Order Placed Successfully!',
-      description: `Your order ID is ${order.id}. We will contact you shortly.`,
-    });
+    createOrder.mutate(
+      {
+        customerName,
+        email,
+        phone,
+        address,
+        city,
+        state,
+        pincode,
+        items: orderItems,
+        totalAmount: calculateTotal(),
+        notes: notes || undefined,
+      },
+      {
+        onSuccess: (data) => {
+          setOrderNumber(data.order_number);
+          setOrderPlaced(true);
+          toast({
+            title: 'Order Placed Successfully!',
+            description: `Your order ID is ${data.order_number}. We will contact you shortly.`,
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: 'Failed to place order. Please try again.',
+            variant: 'destructive',
+          });
+          console.error('Order error:', error);
+        },
+      }
+    );
   };
 
   if (orderPlaced) {
@@ -139,6 +148,9 @@ const Order = () => {
               <h1 className="font-display text-3xl font-bold text-foreground mb-4">
                 Order Placed Successfully!
               </h1>
+              <p className="text-muted-foreground mb-2">
+                Your order number is: <strong className="text-primary">{orderNumber}</strong>
+              </p>
               <p className="text-muted-foreground mb-8">
                 Thank you for choosing Bio Bag India. We have received your order and will contact you 
                 shortly to confirm the details.
@@ -153,9 +165,6 @@ const Order = () => {
       </div>
     );
   }
-
-  const selectedProductData = products.find(p => p.id === selectedProduct);
-  const isCustomBagSelected = selectedProduct === 'custom-bags';
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,14 +183,6 @@ const Order = () => {
               <p className="text-lg text-muted-foreground">
                 Fill in the details below and we'll get back to you with a quote.
               </p>
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="font-semibold text-amber-800">Temporary Notice</p>
-                <p className="text-amber-700 text-sm mt-1">
-                  Online purchasing is currently unavailable due to system maintenance.
-                  We are upgrading our database to provide a secure and reliable shopping experience.
-                  Please revisit shortly.
-                </p>
-              </div>
             </div>
           </div>
         </section>
@@ -189,245 +190,253 @@ const Order = () => {
         {/* Order Form */}
         <section className="py-16">
           <div className="container mx-auto px-4">
-            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-              <div className="grid lg:grid-cols-2 gap-12">
-                {/* Product Selection */}
-                <div className="space-y-8">
-                  <div>
-                    <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                      Select Products
-                    </h2>
+            {productsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+                <div className="grid lg:grid-cols-2 gap-12">
+                  {/* Product Selection */}
+                  <div className="space-y-8">
+                    <div>
+                      <h2 className="font-display text-2xl font-bold text-foreground mb-6">
+                        Select Products
+                      </h2>
 
-                    {/* Add Item Form */}
-                    <div className="p-6 bg-card rounded-xl border border-border space-y-4">
-                      <div>
-                        <Label htmlFor="product">Product</Label>
-                        <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Select a product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {selectedProductData && isCustomBagSelected && (
+                      {/* Add Item Form */}
+                      <div className="p-6 bg-card rounded-xl border border-border space-y-4">
                         <div>
-                          <Label htmlFor="customSize">Size (in inches, e.g., 12 X 16)</Label>
-                          <Input
-                            id="customSize"
-                            value={customSize}
-                            onChange={(e) => setCustomSize(e.target.value)}
-                            placeholder="Enter size like 12 X 16"
-                            className="mt-1"
-                          />
-                        </div>
-                      )}
-
-                      {selectedProductData && !isCustomBagSelected && selectedProductData.sizes.length > 0 && (
-                        <div>
-                          <Label htmlFor="size">Size</Label>
-                          <Select value={selectedSize} onValueChange={setSelectedSize}>
+                          <Label htmlFor="product">Product</Label>
+                          <Select value={selectedProduct} onValueChange={setSelectedProduct}>
                             <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select size" />
+                              <SelectValue placeholder="Select a product" />
                             </SelectTrigger>
                             <SelectContent>
-                              {selectedProductData.sizes.map((size) => (
-                                <SelectItem key={size.size} value={size.size}>
-                                  {size.size} ({size.capacity}) - {size.pcsPerKg} pcs/kg
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
-                      )}
 
+                        {selectedProductData && isCustomBag && (
+                          <div>
+                            <Label htmlFor="customSize">Size (in inches, e.g., 12 X 16)</Label>
+                            <Input
+                              id="customSize"
+                              value={customSize}
+                              onChange={(e) => setCustomSize(e.target.value)}
+                              placeholder="Enter size like 12 X 16"
+                              className="mt-1"
+                            />
+                          </div>
+                        )}
+
+                        {selectedProductData && !isCustomBag && selectedProductData.sizes.length > 0 && (
+                          <div>
+                            <Label htmlFor="size">Size</Label>
+                            <Select value={selectedSize} onValueChange={setSelectedSize}>
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="Select size" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {selectedProductData.sizes.map((size) => (
+                                  <SelectItem key={size.size} value={size.size}>
+                                    {size.size} ({size.capacity}) - {size.pcsPerKg} pcs/kg
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        <div>
+                          <Label htmlFor="quantity">Quantity (in kg)</Label>
+                          <Input
+                            id="quantity"
+                            type="number"
+                            min="1"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value)}
+                            placeholder="Enter quantity in kg"
+                            className="mt-1"
+                          />
+                        </div>
+
+                        <Button type="button" onClick={addItem} variant="outline" className="w-full">
+                          <Plus className="w-4 h-4" />
+                          Add to Order
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Order Items */}
+                    {orderItems.length > 0 && (
                       <div>
-                        <Label htmlFor="quantity">Quantity (in kg)</Label>
+                        <h3 className="font-display text-lg font-semibold text-foreground mb-4">
+                          Order Items
+                        </h3>
+                        <div className="space-y-3">
+                          {orderItems.map((item, index) => (
+                            <div 
+                              key={index}
+                              className="flex items-center justify-between p-4 bg-muted rounded-lg"
+                            >
+                              <div>
+                                <p className="font-medium text-foreground">{item.productName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Size: {item.size} | Qty: {item.quantity} kg
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeItem(index)}
+                                className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Customer Details */}
+                  <div className="space-y-6">
+                    <h2 className="font-display text-2xl font-bold text-foreground mb-6">
+                      Customer Details
+                    </h2>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <Label htmlFor="name">Full Name *</Label>
                         <Input
-                          id="quantity"
-                          type="number"
-                          min="1"
-                          value={quantity}
-                          onChange={(e) => setQuantity(e.target.value)}
-                          placeholder="Enter quantity in kg"
+                          id="name"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder="Enter your full name"
                           className="mt-1"
+                          required
                         />
                       </div>
 
-                      <Button type="button" onClick={addItem} variant="outline" className="w-full">
-                        <Plus className="w-4 h-4" />
-                        Add to Order
-                      </Button>
-                    </div>
-                  </div>
+                      <div>
+                        <Label htmlFor="email">Email *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="your@email.com"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
 
-                  {/* Order Items */}
-                  {orderItems.length > 0 && (
-                    <div>
-                      <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-                        Order Items
-                      </h3>
-                      <div className="space-y-3">
-                        {orderItems.map((item, index) => (
-                          <div 
-                            key={index}
-                            className="flex items-center justify-between p-4 bg-muted rounded-lg"
-                          >
-                            <div>
-                              <p className="font-medium text-foreground">{item.productName}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Size: {item.size} | Qty: {item.quantity} kg
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="p-2 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
+                      <div>
+                        <Label htmlFor="phone">Phone Number *</Label>
+                        <Input
+                          id="phone"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+91 XXXXX XXXXX"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
 
+                      <div className="col-span-2">
+                        <Label htmlFor="address">Address *</Label>
+                        <Textarea
+                          id="address"
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          placeholder="Enter your complete address"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="city">City *</Label>
+                        <Input
+                          id="city"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          placeholder="City"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="state">State *</Label>
+                        <Input
+                          id="state"
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          placeholder="State"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <Label htmlFor="pincode">Pincode *</Label>
+                        <Input
+                          id="pincode"
+                          value={pincode}
+                          onChange={(e) => setPincode(e.target.value)}
+                          placeholder="Pincode"
+                          className="mt-1"
+                          required
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <Label htmlFor="notes">Additional Notes (Optional)</Label>
+                        <Textarea
+                          id="notes"
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder="Any special requirements or custom printing needs..."
+                          className="mt-1"
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Customer Details */}
-                <div className="space-y-6">
-                  <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                    Customer Details
-                  </h2>
+                    <Button 
+                      type="submit" 
+                      variant="hero" 
+                      size="xl" 
+                      className="w-full"
+                      disabled={createOrder.isPending || orderItems.length === 0}
+                    >
+                      {createOrder.isPending ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingBag className="w-5 h-5" />
+                          Place Order
+                        </>
+                      )}
+                    </Button>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="Enter your full name"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="email">Email *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="your@email.com"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <Input
-                        id="phone"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+91 XXXXX XXXXX"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <Label htmlFor="address">Address *</Label>
-                      <Textarea
-                        id="address"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Enter your complete address"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="city">City *</Label>
-                      <Input
-                        id="city"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        placeholder="City"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="state">State *</Label>
-                      <Input
-                        id="state"
-                        value={state}
-                        onChange={(e) => setState(e.target.value)}
-                        placeholder="State"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <Label htmlFor="pincode">Pincode *</Label>
-                      <Input
-                        id="pincode"
-                        value={pincode}
-                        onChange={(e) => setPincode(e.target.value)}
-                        placeholder="Pincode"
-                        className="mt-1"
-                        required
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <Label htmlFor="notes">Additional Notes (Optional)</Label>
-                      <Textarea
-                        id="notes"
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Any special requirements or custom printing needs..."
-                        className="mt-1"
-                      />
-                    </div>
+                    <p className="text-sm text-muted-foreground text-center">
+                      By placing an order, you agree to our terms and conditions. 
+                      We will contact you to confirm the order and provide final pricing.
+                    </p>
                   </div>
-
-                  <Button 
-                    type="submit" 
-                    variant="hero" 
-                    size="xl" 
-                    className="w-full"
-                    disabled={isSubmitting || orderItems.length === 0}
-                  >
-                    {isSubmitting ? (
-                      <>Processing...</>
-                    ) : (
-                      <>
-                        <ShoppingBag className="w-5 h-5" />
-                        Place Order
-                      </>
-                    )}
-                  </Button>
-
-                  <p className="text-sm text-muted-foreground text-center">
-                    By placing an order, you agree to our terms and conditions. 
-                    We will contact you to confirm the order and provide final pricing.
-                  </p>
                 </div>
-              </div>
-            </form>
+              </form>
+            )}
           </div>
         </section>
       </main>
