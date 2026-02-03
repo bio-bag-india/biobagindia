@@ -6,15 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { useSubmitContact } from '@/hooks/use-contacts';
 import { MapPin, Phone, Mail, Clock, Send } from 'lucide-react';
 
 const Contact = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [subject, setSubject] = useState('');
+  const [company, setCompany] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const submitContact = useSubmitContact();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,21 +30,31 @@ const Contact = () => {
       return;
     }
 
-    setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSubmitting(false);
-
-    toast({
-      title: 'Message Sent!',
-      description: 'Thank you for contacting us. We will get back to you soon.',
-    });
-
-    // Reset form
-    setName('');
-    setEmail('');
-    setPhone('');
-    setSubject('');
-    setMessage('');
+    submitContact.mutate(
+      { name, email, phone: phone || undefined, company: company || undefined, message },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Message Sent!',
+            description: 'Thank you for contacting us. We will get back to you soon.',
+          });
+          // Reset form
+          setName('');
+          setEmail('');
+          setPhone('');
+          setCompany('');
+          setMessage('');
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: 'Failed to send message. Please try again.',
+            variant: 'destructive',
+          });
+          console.error('Contact form error:', error);
+        },
+      }
+    );
   };
 
   return (
@@ -181,12 +193,12 @@ const Contact = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="subject">Subject</Label>
+                      <Label htmlFor="company">Company</Label>
                       <Input
-                        id="subject"
-                        value={subject}
-                        onChange={(e) => setSubject(e.target.value)}
-                        placeholder="Bulk Order Inquiry"
+                        id="company"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        placeholder="Your Company Name"
                         className="mt-1"
                       />
                     </div>
@@ -209,9 +221,9 @@ const Contact = () => {
                     variant="hero" 
                     size="lg" 
                     className="w-full"
-                    disabled={isSubmitting}
+                    disabled={submitContact.isPending}
                   >
-                    {isSubmitting ? (
+                    {submitContact.isPending ? (
                       'Sending...'
                     ) : (
                       <>

@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { 
-  Product, 
-  ProductSize, 
-  getProducts, 
-  addProduct, 
-  updateProduct, 
-  deleteProduct, 
-  toggleProductStatus 
-} from '@/lib/productStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { 
+  useProducts, 
+  useAddProduct, 
+  useUpdateProduct, 
+  useDeleteProduct, 
+  useToggleProductStatus,
+  Product,
+  ProductSize 
+} from '@/hooks/use-products';
 import { 
   Plus, 
   Search, 
@@ -22,7 +22,8 @@ import {
   EyeOff, 
   X,
   Package,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 
 const categories = [
@@ -59,7 +60,12 @@ const emptyForm: ProductFormData = {
 };
 
 const ProductManagement = () => {
-  const [products, setProducts] = useState<Product[]>(getProducts());
+  const { data: products = [], isLoading } = useProducts();
+  const addProduct = useAddProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
+  const toggleStatus = useToggleProductStatus();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
@@ -67,8 +73,6 @@ const ProductManagement = () => {
   const [formData, setFormData] = useState<ProductFormData>(emptyForm);
   const [newFeature, setNewFeature] = useState('');
   const [newSize, setNewSize] = useState<ProductSize>({ size: '', micron: 0, capacity: '', pcsPerKg: 0 });
-
-  const refreshProducts = () => setProducts(getProducts());
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = 
@@ -101,26 +105,33 @@ const ProductManagement = () => {
 
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
-      const deleted = deleteProduct(id);
-      if (deleted) {
-        refreshProducts();
-        toast({
-          title: 'Product Deleted',
-          description: `${name} has been deleted successfully.`,
-        });
-      }
+      deleteProduct.mutate(id, {
+        onSuccess: () => {
+          toast({
+            title: 'Product Deleted',
+            description: `${name} has been deleted successfully.`,
+          });
+        },
+        onError: () => {
+          toast({
+            title: 'Error',
+            description: 'Failed to delete product.',
+            variant: 'destructive',
+          });
+        },
+      });
     }
   };
 
-  const handleToggleStatus = (id: string) => {
-    const updated = toggleProductStatus(id);
-    if (updated) {
-      refreshProducts();
-      toast({
-        title: updated.isActive ? 'Product Activated' : 'Product Deactivated',
-        description: `${updated.name} is now ${updated.isActive ? 'visible' : 'hidden'} on the products page.`,
-      });
-    }
+  const handleToggleStatus = (id: string, isActive: boolean, name: string) => {
+    toggleStatus.mutate({ id, isActive }, {
+      onSuccess: (data) => {
+        toast({
+          title: data.isActive ? 'Product Activated' : 'Product Deactivated',
+          description: `${name} is now ${data.isActive ? 'visible' : 'hidden'} on the products page.`,
+        });
+      },
+    });
   };
 
   const handleAddFeature = () => {
@@ -154,27 +165,52 @@ const ProductManagement = () => {
     }
 
     if (editingProduct) {
-      const updated = updateProduct(editingProduct.id, formData);
-      if (updated) {
-        refreshProducts();
-        setShowModal(false);
-        toast({
-          title: 'Product Updated',
-          description: `${formData.name} has been updated successfully.`,
-        });
-      }
+      updateProduct.mutate(
+        { id: editingProduct.id, ...formData },
+        {
+          onSuccess: () => {
+            setShowModal(false);
+            toast({
+              title: 'Product Updated',
+              description: `${formData.name} has been updated successfully.`,
+            });
+          },
+          onError: () => {
+            toast({
+              title: 'Error',
+              description: 'Failed to update product.',
+              variant: 'destructive',
+            });
+          },
+        }
+      );
     } else {
-      const newProduct = addProduct(formData);
-      if (newProduct) {
-        refreshProducts();
-        setShowModal(false);
-        toast({
-          title: 'Product Added',
-          description: `${formData.name} has been added successfully.`,
-        });
-      }
+      addProduct.mutate(formData, {
+        onSuccess: () => {
+          setShowModal(false);
+          toast({
+            title: 'Product Added',
+            description: `${formData.name} has been added successfully.`,
+          });
+        },
+        onError: () => {
+          toast({
+            title: 'Error',
+            description: 'Failed to add product.',
+            variant: 'destructive',
+          });
+        },
+      });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -258,8 +294,9 @@ const ProductManagement = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleToggleStatus(product.id)}
+                onClick={() => handleToggleStatus(product.id, product.isActive, product.name)}
                 className={product.isActive ? 'text-primary' : 'text-muted-foreground'}
+                disabled={toggleStatus.isPending}
               >
                 {product.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </Button>
@@ -268,6 +305,7 @@ const ProductManagement = () => {
                 size="sm"
                 onClick={() => handleDelete(product.id, product.name)}
                 className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                disabled={deleteProduct.isPending}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -455,27 +493,24 @@ const ProductManagement = () => {
                 )}
               </div>
 
-              {/* Active Status */}
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="isActive" className="text-sm text-foreground">
-                  Product is active and visible on the products page
-                </label>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t">
+              {/* Submit */}
+              <div className="flex gap-4 pt-4 border-t">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="flex-1">
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1">
-                  {editingProduct ? 'Update Product' : 'Add Product'}
+                <Button 
+                  type="submit" 
+                  className="flex-1"
+                  disabled={addProduct.isPending || updateProduct.isPending}
+                >
+                  {(addProduct.isPending || updateProduct.isPending) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    editingProduct ? 'Update Product' : 'Add Product'
+                  )}
                 </Button>
               </div>
             </form>
