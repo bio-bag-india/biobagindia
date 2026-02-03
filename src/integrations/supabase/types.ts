@@ -14,7 +14,215 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contacts: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string
+          id: string
+          is_read: boolean
+          message: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          is_read?: boolean
+          message: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          price_per_kg: number
+          product_id: string | null
+          product_name: string
+          quantity: number
+          size: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          price_per_kg?: number
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          size: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          price_per_kg?: number
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          size?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          address: string
+          city: string
+          created_at: string
+          customer_name: string
+          email: string
+          id: string
+          notes: string | null
+          order_number: string
+          phone: string
+          pincode: string
+          state: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          city: string
+          created_at?: string
+          customer_name: string
+          email: string
+          id?: string
+          notes?: string | null
+          order_number: string
+          phone: string
+          pincode: string
+          state: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          city?: string
+          created_at?: string
+          customer_name?: string
+          email?: string
+          id?: string
+          notes?: string | null
+          order_number?: string
+          phone?: string
+          pincode?: string
+          state?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      product_sizes: {
+        Row: {
+          capacity: string
+          created_at: string
+          id: string
+          micron: number
+          pcs_per_kg: number
+          product_id: string
+          size: string
+        }
+        Insert: {
+          capacity: string
+          created_at?: string
+          id?: string
+          micron?: number
+          pcs_per_kg?: number
+          product_id: string
+          size: string
+        }
+        Update: {
+          capacity?: string
+          created_at?: string
+          id?: string
+          micron?: number
+          pcs_per_kg?: number
+          product_id?: string
+          size?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_sizes_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          category: Database["public"]["Enums"]["product_category"]
+          created_at: string
+          description: string | null
+          features: string[] | null
+          id: string
+          image: string | null
+          is_active: boolean
+          name: string
+          price_per_kg: number
+          updated_at: string
+        }
+        Insert: {
+          category?: Database["public"]["Enums"]["product_category"]
+          created_at?: string
+          description?: string | null
+          features?: string[] | null
+          id?: string
+          image?: string | null
+          is_active?: boolean
+          name: string
+          price_per_kg?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["product_category"]
+          created_at?: string
+          description?: string | null
+          features?: string[] | null
+          id?: string
+          image?: string | null
+          is_active?: boolean
+          name?: string
+          price_per_kg?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +231,22 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      order_status:
+        | "pending"
+        | "confirmed"
+        | "processing"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
+      product_category:
+        | "carry"
+        | "garbage"
+        | "grocery"
+        | "courier"
+        | "nursery"
+        | "medical"
+        | "agriculture"
+        | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +373,25 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      order_status: [
+        "pending",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+      ],
+      product_category: [
+        "carry",
+        "garbage",
+        "grocery",
+        "courier",
+        "nursery",
+        "medical",
+        "agriculture",
+        "custom",
+      ],
+    },
   },
 } as const
