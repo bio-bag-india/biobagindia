@@ -1,7 +1,13 @@
-import { useState } from 'react';
+ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, ShoppingBag, MessageCircle } from 'lucide-react';
+ import { Menu, X, ShoppingBag, MessageCircle, ChevronDown, Package, Shield } from 'lucide-react';
+ import {
+   DropdownMenu,
+   DropdownMenuContent,
+   DropdownMenuItem,
+   DropdownMenuTrigger,
+ } from '@/components/ui/dropdown-menu';
 import cpcbLogo from '@/assets/cpcb-logo.png';
 import bioBagLogo from '@/assets/bio-bag-india-logo.png';
 
@@ -53,6 +59,31 @@ const Header = () => {
               <MessageCircle className="w-5 h-5" />
             </a>
             <img src={cpcbLogo} alt="CPCB Certified" className="h-12 w-auto" />
+             
+             {/* Dropdown Menu */}
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="outline" className="gap-2">
+                   More
+                   <ChevronDown className="w-4 h-4" />
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent align="end" className="w-48">
+                 <DropdownMenuItem asChild>
+                   <Link to="/track-order" className="flex items-center gap-2 cursor-pointer">
+                     <Package className="w-4 h-4" />
+                     Track Your Order
+                   </Link>
+                 </DropdownMenuItem>
+                 <DropdownMenuItem asChild>
+                   <Link to="/auth" className="flex items-center gap-2 cursor-pointer">
+                     <Shield className="w-4 h-4" />
+                     Admin
+                   </Link>
+                 </DropdownMenuItem>
+               </DropdownMenuContent>
+             </DropdownMenu>
+ 
             <Link to="/order">
               <Button variant="hero" size="lg">
                 <ShoppingBag className="w-4 h-4" />
@@ -90,6 +121,22 @@ const Header = () => {
                   {link.label}
                 </Link>
               ))}
+             <Link 
+               to="/track-order" 
+               onClick={() => setIsMenuOpen(false)}
+               className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+             >
+               <Package className="w-4 h-4" />
+               Track Your Order
+             </Link>
+             <Link 
+               to="/auth" 
+               onClick={() => setIsMenuOpen(false)}
+               className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+             >
+               <Shield className="w-4 h-4" />
+               Admin
+             </Link>
               <Link to="/order" onClick={() => setIsMenuOpen(false)}>
                 <Button variant="hero" className="w-full">
                   <ShoppingBag className="w-4 h-4" />
