@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+ import { useState, useEffect } from 'react';
+ import { Link, useNavigate } from 'react-router-dom';
+ import { useAuth } from '@/hooks/use-auth';
 import { useOrders, useUpdateOrderStatus, useDeleteOrder, Order } from '@/hooks/use-orders';
 import { useProducts } from '@/hooks/use-products';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,8 @@ const statusIcons: Record<OrderStatus, typeof Clock> = {
 };
 
 const Admin = () => {
+   const { user, isAdmin, isLoading: authLoading, signOut } = useAuth();
+   const navigate = useNavigate();
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
   const { data: products = [] } = useProducts();
   const updateOrderStatus = useUpdateOrderStatus();
@@ -60,6 +63,32 @@ const Admin = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products'>('dashboard');
 
+   // Redirect if not authenticated or not admin
+   useEffect(() => {
+     if (!authLoading && (!user || !isAdmin)) {
+       navigate('/auth');
+     }
+   }, [user, isAdmin, authLoading, navigate]);
+ 
+   const handleSignOut = async () => {
+     await signOut();
+     navigate('/');
+   };
+ 
+   // Show loading while checking auth
+   if (authLoading) {
+     return (
+       <div className="min-h-screen flex items-center justify-center bg-background">
+         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+       </div>
+     );
+   }
+ 
+   // Don't render if not admin
+   if (!user || !isAdmin) {
+     return null;
+   }
+ 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
       order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -165,12 +194,22 @@ const Admin = () => {
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
-          <Link to="/">
-            <Button variant="outline" size="sm" className="w-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Website
-            </Button>
-          </Link>
+           <div className="space-y-2">
+             <Link to="/">
+               <Button variant="outline" size="sm" className="w-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent">
+                 <ArrowLeft className="w-4 h-4" />
+                 Back to Website
+               </Button>
+             </Link>
+             <Button 
+               variant="ghost" 
+               size="sm" 
+               className="w-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+               onClick={handleSignOut}
+             >
+               Sign Out
+             </Button>
+           </div>
         </div>
       </aside>
 
@@ -191,6 +230,9 @@ const Admin = () => {
               <ArrowLeft className="w-4 h-4" />
             </Button>
           </Link>
+           <Button variant="ghost" size="sm" onClick={handleSignOut}>
+             Sign Out
+           </Button>
         </div>
 
         {/* Mobile Tab Navigation */}
