@@ -36,11 +36,10 @@
    const navigate = useNavigate();
  
     useEffect(() => {
-      if (!isLoading && user) {
-        // Always redirect logged-in users - admin check happens on Admin page
+      if (!isLoading && user && isAdmin) {
         navigate('/admin');
       }
-    }, [user, isLoading, navigate]);
+    }, [user, isAdmin, isLoading, navigate]);
  
    const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -72,8 +71,7 @@
               title: 'Welcome!',
               description: 'You have successfully logged in.',
             });
-            // Navigate immediately after successful login
-            navigate('/admin');
+            // Redirect handled by useEffect after isAdmin resolves
           }
        } else {
          const result = signupSchema.safeParse({ email, password, confirmPassword });
