@@ -35,11 +35,12 @@
    const { signIn, signUp, user, isAdmin, isLoading } = useAuth();
    const navigate = useNavigate();
  
-   useEffect(() => {
-     if (!isLoading && user && isAdmin) {
-       navigate('/admin');
-     }
-   }, [user, isAdmin, isLoading, navigate]);
+    useEffect(() => {
+      if (!isLoading && user) {
+        // Always redirect logged-in users - admin check happens on Admin page
+        navigate('/admin');
+      }
+    }, [user, isLoading, navigate]);
  
    const handleSubmit = async (e: React.FormEvent) => {
      e.preventDefault();
@@ -59,19 +60,21 @@
            return;
          }
  
-         const { error } = await signIn(emailOrPhone, password);
-         if (error) {
-           toast({
-             title: 'Login Failed',
-             description: error.message,
-             variant: 'destructive',
-           });
-         } else {
-           toast({
-             title: 'Welcome!',
-             description: 'You have successfully logged in.',
-           });
-         }
+          const { error } = await signIn(emailOrPhone, password);
+          if (error) {
+            toast({
+              title: 'Login Failed',
+              description: error.message,
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Welcome!',
+              description: 'You have successfully logged in.',
+            });
+            // Navigate immediately after successful login
+            navigate('/admin');
+          }
        } else {
          const result = signupSchema.safeParse({ email, password, confirmPassword });
          if (!result.success) {
