@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { z } from 'zod';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,26 @@ import { useActiveProducts, Product } from '@/hooks/use-products';
 import { useCreateOrder, OrderItem } from '@/hooks/use-orders';
 import { toast } from '@/hooks/use-toast';
 import { ShoppingBag, Plus, Trash2, Check, Loader2 } from 'lucide-react';
+
+const orderItemSchema = z.object({
+  productId: z.string().nullable(),
+  productName: z.string().min(1).max(100),
+  size: z.string().min(1).max(50),
+  quantity: z.number().int().min(1, "Quantity must be at least 1 kg").max(100000, "Quantity too large"),
+  pricePerKg: z.number().min(0),
+});
+
+const orderSchema = z.object({
+  customerName: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+  email: z.string().trim().email("Invalid email format").max(255),
+  phone: z.string().trim().regex(/^\+?[0-9\s-]{10,15}$/, "Invalid phone number (10-15 digits)"),
+  address: z.string().trim().min(10, "Address too short").max(500, "Address too long"),
+  city: z.string().trim().min(2, "City is required").max(100),
+  state: z.string().trim().min(2, "State is required").max(100),
+  pincode: z.string().trim().regex(/^\d{6}$/, "Pincode must be 6 digits"),
+  items: z.array(orderItemSchema).min(1, "Add at least one item"),
+  notes: z.string().max(1000, "Notes too long").optional(),
+});
 
 const Order = () => {
   const [customerName, setCustomerName] = useState('');
@@ -83,26 +104,8 @@ const Order = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (orderItems.length === 0) {
-      toast({
-        title: 'No Items',
-        description: 'Please add at least one item to your order.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!customerName || !email || !phone || !address || !city || !state || !pincode) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please fill in all required fields.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    createOrder.mutate(
-      {
+    try {
+      const validatedData = orderSchema.parse({
         customerName,
         email,
         phone,
@@ -111,28 +114,50 @@ const Order = () => {
         state,
         pincode,
         items: orderItems,
-        totalAmount: calculateTotal(),
         notes: notes || undefined,
-      },
-      {
-        onSuccess: (data) => {
-          setOrderNumber(data.order_number);
-          setOrderPlaced(true);
-          toast({
-            title: 'Order Placed Successfully!',
-            description: `Your order ID is ${data.order_number}. We will contact you shortly.`,
-          });
+      });
+
+      createOrder.mutate(
+        {
+          customerName: validatedData.customerName,
+          email: validatedData.email,
+          phone: validatedData.phone,
+          address: validatedData.address,
+          city: validatedData.city,
+          state: validatedData.state,
+          pincode: validatedData.pincode,
+          items: validatedData.items as OrderItem[],
+          totalAmount: calculateTotal(),
+          notes: validatedData.notes,
         },
-        onError: (error) => {
-          toast({
-            title: 'Error',
-            description: 'Failed to place order. Please try again.',
-            variant: 'destructive',
-          });
-          console.error('Order error:', error);
-        },
+        {
+          onSuccess: (data) => {
+            setOrderNumber(data.order_number);
+            setOrderPlaced(true);
+            toast({
+              title: 'Order Placed Successfully!',
+              description: `Your order ID is ${data.order_number}. We will contact you shortly.`,
+            });
+          },
+          onError: (error) => {
+            toast({
+              title: 'Error',
+              description: 'Failed to place order. Please try again.',
+              variant: 'destructive',
+            });
+            console.error('Order error:', error);
+          },
+        }
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: 'Validation Error',
+          description: error.errors[0].message,
+          variant: 'destructive',
+        });
       }
-    );
+    }
   };
 
   if (orderPlaced) {
@@ -231,6 +256,7 @@ const Order = () => {
                               onChange={(e) => setCustomSize(e.target.value)}
                               placeholder="Enter size like 12 X 16"
                               className="mt-1"
+                              maxLength={50}
                             />
                           </div>
                         )}
@@ -320,6 +346,7 @@ const Order = () => {
                           onChange={(e) => setCustomerName(e.target.value)}
                           placeholder="Enter your full name"
                           className="mt-1"
+                          maxLength={100}
                           required
                         />
                       </div>
@@ -333,6 +360,7 @@ const Order = () => {
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="your@email.com"
                           className="mt-1"
+                          maxLength={255}
                           required
                         />
                       </div>
@@ -345,6 +373,7 @@ const Order = () => {
                           onChange={(e) => setPhone(e.target.value)}
                           placeholder="+91 XXXXX XXXXX"
                           className="mt-1"
+                          maxLength={15}
                           required
                         />
                       </div>
@@ -357,6 +386,7 @@ const Order = () => {
                           onChange={(e) => setAddress(e.target.value)}
                           placeholder="Enter your complete address"
                           className="mt-1"
+                          maxLength={500}
                           required
                         />
                       </div>
@@ -369,6 +399,7 @@ const Order = () => {
                           onChange={(e) => setCity(e.target.value)}
                           placeholder="City"
                           className="mt-1"
+                          maxLength={100}
                           required
                         />
                       </div>
@@ -381,6 +412,7 @@ const Order = () => {
                           onChange={(e) => setState(e.target.value)}
                           placeholder="State"
                           className="mt-1"
+                          maxLength={100}
                           required
                         />
                       </div>
@@ -393,6 +425,7 @@ const Order = () => {
                           onChange={(e) => setPincode(e.target.value)}
                           placeholder="Pincode"
                           className="mt-1"
+                          maxLength={6}
                           required
                         />
                       </div>
@@ -405,6 +438,7 @@ const Order = () => {
                           onChange={(e) => setNotes(e.target.value)}
                           placeholder="Any special requirements or custom printing needs..."
                           className="mt-1"
+                          maxLength={1000}
                         />
                       </div>
                     </div>

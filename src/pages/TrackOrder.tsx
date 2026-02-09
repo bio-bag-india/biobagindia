@@ -65,76 +65,79 @@
  
  const statusSteps: OrderStatus[] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
  
- const TrackOrder = () => {
-   const [orderNumber, setOrderNumber] = useState('');
-   const [isSearching, setIsSearching] = useState(false);
-   const [order, setOrder] = useState<TrackedOrder | null>(null);
-   const [notFound, setNotFound] = useState(false);
- 
-   const handleSearch = async (e: React.FormEvent) => {
-     e.preventDefault();
-     
-     if (!orderNumber.trim()) {
-       toast({
-         title: 'Enter Order Number',
-         description: 'Please enter your order number to track.',
-         variant: 'destructive',
-       });
-       return;
-     }
- 
-     setIsSearching(true);
-     setNotFound(false);
-     setOrder(null);
- 
-     try {
-       const { data: orderData, error: orderError } = await supabase
-         .from('orders')
-         .select('*')
-         .eq('order_number', orderNumber.trim().toUpperCase())
-         .maybeSingle();
- 
-       if (orderError) throw orderError;
- 
-       if (!orderData) {
-         setNotFound(true);
-         return;
-       }
- 
-       const { data: itemsData } = await supabase
-         .from('order_items')
-         .select('*')
-         .eq('order_id', orderData.id);
- 
-       setOrder({
-         orderNumber: orderData.order_number,
-         customerName: orderData.customer_name,
-         email: orderData.email,
-         phone: orderData.phone,
-         address: orderData.address,
-         city: orderData.city,
-         state: orderData.state,
-         pincode: orderData.pincode,
-         status: orderData.status,
-         totalAmount: Number(orderData.total_amount),
-         createdAt: new Date(orderData.created_at),
-         items: (itemsData || []).map(item => ({
-           productName: item.product_name,
-           size: item.size,
-           quantity: item.quantity,
-           pricePerKg: Number(item.price_per_kg),
-         })),
-       });
-     } catch (error) {
-       toast({
-         title: 'Error',
-         description: 'Failed to fetch order details. Please try again.',
-         variant: 'destructive',
-       });
-     } finally {
-       setIsSearching(false);
-     }
-   };
+const TrackOrder = () => {
+  const [orderNumber, setOrderNumber] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [order, setOrder] = useState<TrackedOrder | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!orderNumber.trim() || !verificationEmail.trim()) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter both your order number and email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSearching(true);
+    setNotFound(false);
+    setOrder(null);
+
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .rpc('track_order', {
+          p_order_number: orderNumber.trim().toUpperCase(),
+          p_email: verificationEmail.trim(),
+        });
+
+      if (orderError) throw orderError;
+
+      if (!orderData || orderData.length === 0) {
+        setNotFound(true);
+        return;
+      }
+
+      const foundOrder = orderData[0];
+
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', foundOrder.id);
+
+      setOrder({
+        orderNumber: foundOrder.order_number,
+        customerName: foundOrder.customer_name,
+        email: foundOrder.email,
+        phone: foundOrder.phone,
+        address: foundOrder.address,
+        city: foundOrder.city,
+        state: foundOrder.state,
+        pincode: foundOrder.pincode,
+        status: foundOrder.status,
+        totalAmount: Number(foundOrder.total_amount),
+        createdAt: new Date(foundOrder.created_at),
+        items: (itemsData || []).map(item => ({
+          productName: item.product_name,
+          size: item.size,
+          quantity: item.quantity,
+          pricePerKg: Number(item.price_per_kg),
+        })),
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch order details. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
  
    const getStatusIndex = (status: OrderStatus) => {
      if (status === 'cancelled') return -1;
@@ -159,38 +162,48 @@
            </p>
          </div>
  
-         {/* Search Form */}
-         <form onSubmit={handleSearch} className="max-w-xl mx-auto mb-12">
-           <div className="flex gap-3">
-             <div className="relative flex-1">
-               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-               <Input
-                 placeholder="Enter order number (e.g., ORD-000001)"
-                 value={orderNumber}
-                 onChange={(e) => setOrderNumber(e.target.value)}
-                 className="pl-12 h-12 text-lg"
-               />
-             </div>
-             <Button type="submit" variant="hero" size="lg" disabled={isSearching}>
-               {isSearching ? (
-                 <Loader2 className="w-5 h-5 animate-spin" />
-               ) : (
-                 'Track'
-               )}
-             </Button>
-           </div>
-         </form>
+          {/* Search Form */}
+          <form onSubmit={handleSearch} className="max-w-xl mx-auto mb-12 space-y-3">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                placeholder="Enter order number (e.g., ORD-000001)"
+                value={orderNumber}
+                onChange={(e) => setOrderNumber(e.target.value)}
+                className="pl-12 h-12 text-lg"
+                maxLength={20}
+              />
+            </div>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="Enter your email address"
+                value={verificationEmail}
+                onChange={(e) => setVerificationEmail(e.target.value)}
+                className="pl-12 h-12 text-lg"
+                maxLength={255}
+              />
+            </div>
+            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isSearching}>
+              {isSearching ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                'Track Order'
+              )}
+            </Button>
+          </form>
  
          {/* Not Found Message */}
-         {notFound && (
-           <div className="max-w-xl mx-auto text-center py-12 bg-card rounded-2xl border border-border">
-             <XCircle className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
-             <h2 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h2>
-             <p className="text-muted-foreground">
-               We couldn't find an order with number "{orderNumber}". Please check and try again.
-             </p>
-           </div>
-         )}
+          {notFound && (
+            <div className="max-w-xl mx-auto text-center py-12 bg-card rounded-2xl border border-border">
+              <XCircle className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h2>
+              <p className="text-muted-foreground">
+                We couldn't find an order matching that order number and email. Please check and try again.
+              </p>
+            </div>
+          )}
  
          {/* Order Details */}
          {order && (

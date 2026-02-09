@@ -256,6 +256,31 @@ export type Database = {
         }
         Returns: boolean
       }
+      track_order: {
+        Args: { p_email: string; p_order_number: string }
+        Returns: {
+          address: string
+          city: string
+          created_at: string
+          customer_name: string
+          email: string
+          id: string
+          notes: string | null
+          order_number: string
+          phone: string
+          pincode: string
+          state: string
+          status: Database["public"]["Enums"]["order_status"]
+          total_amount: number
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       app_role: "admin" | "user"
