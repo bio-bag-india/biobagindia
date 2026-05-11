@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -53,9 +54,18 @@ const Order = () => {
 
   const { data: products = [], isLoading: productsLoading } = useActiveProducts();
   const createOrder = useCreateOrder();
+  const location = useLocation();
 
   const selectedProductData = products.find(p => p.id === selectedProduct);
   const isCustomBag = selectedProductData?.category === 'custom';
+
+  // Prefill product from "Order Now" navigation state
+  useEffect(() => {
+    const preId = (location.state as { productId?: string } | null)?.productId;
+    if (preId && products.some(p => p.id === preId)) {
+      setSelectedProduct(preId);
+    }
+  }, [location.state, products]);
 
   const addItem = () => {
     const sizeToUse = isCustomBag ? customSize : selectedSize;

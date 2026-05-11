@@ -100,7 +100,7 @@ const ProductCard = ({ product }: { product: Product }) => {
 
         {/* CTA */}
         <div className="mt-6">
-          <Link to="/order">
+          <Link to="/order" state={{ productId: product.id }}>
             <Button variant="hero" className="w-full">
               <ShoppingBag className="w-4 h-4" />
               Order Now
