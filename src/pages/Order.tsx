@@ -54,9 +54,18 @@ const Order = () => {
 
   const { data: products = [], isLoading: productsLoading } = useActiveProducts();
   const createOrder = useCreateOrder();
+  const location = useLocation();
 
   const selectedProductData = products.find(p => p.id === selectedProduct);
   const isCustomBag = selectedProductData?.category === 'custom';
+
+  // Prefill product from "Order Now" navigation state
+  useEffect(() => {
+    const preId = (location.state as { productId?: string } | null)?.productId;
+    if (preId && products.some(p => p.id === preId)) {
+      setSelectedProduct(preId);
+    }
+  }, [location.state, products]);
 
   const addItem = () => {
     const sizeToUse = isCustomBag ? customSize : selectedSize;
