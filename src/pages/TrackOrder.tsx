@@ -105,9 +105,10 @@ const TrackOrder = () => {
       const foundOrder = orderData[0];
 
       const { data: itemsData } = await supabase
-        .from('order_items')
-        .select('*')
-        .eq('order_id', foundOrder.id);
+        .rpc('track_order_items', {
+          p_order_number: orderNumber.trim().toUpperCase(),
+          p_email: verificationEmail.trim(),
+        });
 
       setOrder({
         orderNumber: foundOrder.order_number,
