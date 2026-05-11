@@ -281,6 +281,25 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      track_order_items: {
+        Args: { p_email: string; p_order_number: string }
+        Returns: {
+          created_at: string
+          id: string
+          order_id: string
+          price_per_kg: number
+          product_id: string | null
+          product_name: string
+          quantity: number
+          size: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "order_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       app_role: "admin" | "user"
