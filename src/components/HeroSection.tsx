@@ -107,12 +107,29 @@ const HeroSection = () => {
             <div className="relative w-full aspect-square">
               {/* Main circle with leaf pattern */}
               <div className="absolute inset-0 gradient-hero rounded-full animate-float shadow-leaf" />
-              <div className="absolute inset-4 bg-card rounded-full flex items-center justify-center">
-                <div className="text-center p-8">
-                  <Leaf className="w-24 h-24 text-primary mx-auto mb-4" />
-                  <h3 className="font-display text-3xl font-bold text-foreground">Say No!</h3>
-                  <p className="text-lg text-primary font-semibold">To Plastic Bags</p>
-                </div>
+              <div className="absolute inset-4 bg-card rounded-full flex items-center justify-center overflow-hidden">
+                {heroImages.length > 0 ? (
+                  <div className="relative w-full h-full">
+                    {heroImages.map((url, idx) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt={`Product ${idx + 1}`}
+                        className={`absolute inset-0 w-full h-full object-cover rounded-full transition-all duration-1000 ease-in-out ${
+                          idx === currentIndex
+                            ? 'opacity-100 scale-100'
+                            : 'opacity-0 scale-105'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center p-8">
+                    <Leaf className="w-24 h-24 text-primary mx-auto mb-4" />
+                    <h3 className="font-display text-3xl font-bold text-foreground">Say No!</h3>
+                    <p className="text-lg text-primary font-semibold">To Plastic Bags</p>
+                  </div>
+                )}
               </div>
               
               {/* CPCB Badge */}
