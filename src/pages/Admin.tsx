@@ -306,6 +306,11 @@ const Admin = () => {
           <ProductManagement />
         )}
 
+        {/* Hero Images Tab */}
+        {activeTab === 'hero' && (
+          <HeroImagesManagement />
+        )}
+
         {/* Orders Section - Show on Dashboard and Orders tab */}
         {(activeTab === 'dashboard' || activeTab === 'orders') && (
         <div className="bg-card rounded-xl border border-border shadow-soft">
