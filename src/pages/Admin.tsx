@@ -266,6 +266,13 @@ const Admin = () => {
           >
             Products
           </Button>
+          <Button 
+            variant={activeTab === 'hero' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveTab('hero')}
+          >
+            Hero Images
+          </Button>
         </div>
 
         {/* Stats - Show on Dashboard */}
