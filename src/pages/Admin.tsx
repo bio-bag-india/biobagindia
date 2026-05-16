@@ -192,6 +192,13 @@ const Admin = () => {
             <ShoppingBag className="w-5 h-5" />
             <span>Products</span>
           </button>
+          <button 
+            onClick={() => setActiveTab('hero')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'hero' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'}`}
+          >
+            <Leaf className="w-5 h-5" />
+            <span>Hero Images</span>
+          </button>
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
