@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import ProductManagement from '@/components/admin/ProductManagement';
+import HeroImagesManagement from '@/components/admin/HeroImagesManagement';
 import { Database } from '@/integrations/supabase/types';
 import { 
   LayoutDashboard, 
