@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import ProductManagement from '@/components/admin/ProductManagement';
+import HeroImagesManagement from '@/components/admin/HeroImagesManagement';
 import { Database } from '@/integrations/supabase/types';
 import { 
   LayoutDashboard, 
@@ -61,7 +62,7 @@ const Admin = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'hero'>('dashboard');
 
    // Redirect if not authenticated or not admin
    useEffect(() => {
@@ -191,6 +192,13 @@ const Admin = () => {
             <ShoppingBag className="w-5 h-5" />
             <span>Products</span>
           </button>
+          <button 
+            onClick={() => setActiveTab('hero')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === 'hero' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent'}`}
+          >
+            <Leaf className="w-5 h-5" />
+            <span>Hero Images</span>
+          </button>
         </nav>
 
         <div className="absolute bottom-6 left-6 right-6">
@@ -258,6 +266,13 @@ const Admin = () => {
           >
             Products
           </Button>
+          <Button 
+            variant={activeTab === 'hero' ? 'default' : 'outline'} 
+            size="sm"
+            onClick={() => setActiveTab('hero')}
+          >
+            Hero Images
+          </Button>
         </div>
 
         {/* Stats - Show on Dashboard */}
@@ -289,6 +304,11 @@ const Admin = () => {
         {/* Products Tab */}
         {activeTab === 'products' && (
           <ProductManagement />
+        )}
+
+        {/* Hero Images Tab */}
+        {activeTab === 'hero' && (
+          <HeroImagesManagement />
         )}
 
         {/* Orders Section - Show on Dashboard and Orders tab */}
