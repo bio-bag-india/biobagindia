@@ -1,9 +1,39 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Leaf, Clock, Award, Recycle } from 'lucide-react';
 import cpcbLogo from '@/assets/cpcb-logo.png';
+import { supabase } from '@/integrations/supabase/client';
 
 const HeroSection = () => {
+  const [heroImages, setHeroImages] = useState<string[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase.storage
+        .from('hero-images')
+        .list('', { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+      if (error || !data) return;
+      const urls = data
+        .filter((f) => f.name && !f.name.startsWith('.'))
+        .map(
+          (f) =>
+            supabase.storage.from('hero-images').getPublicUrl(f.name).data.publicUrl
+        );
+      setHeroImages(urls);
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (heroImages.length < 2) return;
+    const id = setInterval(() => {
+      setCurrentIndex((i) => (i + 1) % heroImages.length);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [heroImages]);
+
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden gradient-nature">
       {/* Animated Background Blobs */}
